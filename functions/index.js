@@ -104,15 +104,10 @@ async function syncUser(uid, key) {
     await psGet(`${API}/users/${me.id}/transaction_accounts`, key)
   ).json();
 
-  // DIAGNOSTIC, remove once due dates are sorted out: dumps every field
-  // PocketSmith actually returns for the first account, so we can check the
-  // Cloud Functions logs for anything due-date-shaped (current_balance_date
-  // is a balance timestamp, not a bill due date, everything else here is
-  // unconfirmed). Doesn't touch Firestore or the client, log-only.
-  if (rawAccts.length) {
-    console.log("PocketSmith transaction_account field dump (first account):",
-      JSON.stringify(rawAccts[0], null, 2));
-  }
+  // Confirmed via a one-time field dump: PocketSmith's transaction_accounts
+  // response has no due-date concept at all (current_balance_date is a
+  // balance snapshot timestamp, not a bill due date). Due dates stay
+  // something entered manually in the app; nothing to pull from here.
 
   const accounts = rawAccts.map((a) => ({
     id: a.id,
