@@ -532,6 +532,7 @@ const firebaseConfig = {
           <span class="fnOf">of <b id="fnSalary">$0.00</b></span>
         </div>
         <p class="fnHelp" id="fnSavingsHint" style="margin-top:8px"></p>
+        <p class="fnHelp" id="fnDebtAttackHint" style="margin-top:4px"></p>
 
         <div id="fnWarn" class="notice" style="display:none"></div>
 
@@ -655,6 +656,10 @@ const firebaseConfig = {
         <label>Set aside as savings<input id="setSavings" type="number" step="0.01"><span class="fnHint">Reminder only, not deducted from Safe to spend</span></label>
         <label>Next payday<input id="setPayday" type="date" readonly title="Calculated from your fortnightly cycle"><span class="fnHint">Calculated automatically</span></label>
       </div>
+
+      <div class="fnSubhead">Card debt attack</div>
+      <p class="fnHelp">Set how much you actually want to pay on each card this fortnight. This is separate from the card's real due amount on the Payments tab, it's an extra goal shown on the dashboard, not deducted from Safe to spend, so it's fine to be ambitious.</p>
+      <div id="fnCardPlanInputs" class="profileBox" style="margin-top:12px"></div>
 
       <div class="actions"><button class="btn" onclick="saveProfileSettings()">Save plan</button></div>
     </div>
@@ -1272,6 +1277,17 @@ function renderFortnight(){
     ? `Recommended: put aside ${money(f.savings)} this fortnight (not deducted above, it's a target, not a bill).`
     : '';
 
+  // Debt attack: extra you've chosen to pay on top of each card's real bill
+  // amount, set under Payments & Setup -> Your plan -> Card debt attack.
+  // Same treatment as the savings target above: it's a goal you're aiming
+  // for, not a bill that's actually due, so it's shown here but never
+  // subtracted from Safe to spend.
+  const attackTotal=f.cardRows.reduce((s,b)=>s+Math.max(0,b.pay-Number(b.amount||0)),0);
+  const debtAttackHint=document.getElementById('fnDebtAttackHint');
+  if(debtAttackHint) debtAttackHint.textContent = attackTotal>0
+    ? `Debt attack: aiming to pay ${money(attackTotal)} extra across your cards this fortnight (not deducted above, it's a goal, not a bill).`
+    : '';
+
   const denom=Math.max(f.cash, f.committed) || 1;
   const pct=v=>(Math.max(0,v)/denom*100)+'%';
   const bar=(id,v)=>{const e=document.getElementById(id); if(e) e.style.width=pct(v);};
@@ -1335,15 +1351,25 @@ function render(){
     renderFortnight();
 
     accounts.innerHTML=data.accounts.map(a=>{
-      const live=(bank && Array.isArray(bank.accounts))
-        ? bank.accounts.find(b=>paymentMatches(b.name,a.name))
-        : null;
+      // Check both feeds, not just CommBank's, so the Latitude card can also
+      // pick up a live balance and the "synced from PocketSmith" tag.
+      const liveBank=(bank && Array.isArray(bank.accounts)) ? bank.accounts.find(b=>paymentMatches(b.name,a.name)) : null;
+      const liveLat=(latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.find(b=>paymentMatches(b.name,a.name)) : null;
+      const live=liveBank||liveLat;
       const balance=live!=null?Math.abs(Number(live.balance)||0):a.balance;
       const available=Math.max(0,a.limit-balance);
       const u=a.limit?Math.min(100,balance/a.limit*100):0;
       const klass=u>=90?'danger':u>=70?'warn':'success';
       const dueBill=data.bills.find(b=>paymentMatches(b.description,a.name));
-      const dueDate=dueBill?niceDate(nextDate(dueBill)):a.due;
+      // live.dueDate (ISO string) is a placeholder field name for whenever
+      // syncBankNow/syncLatitudeNow start writing a real due date pulled from
+      // PocketSmith. Nothing populates it yet, so today this always falls
+      // through to the manually-entered bill/account date below, but once the
+      // Cloud Function starts setting it, the dashboard picks it up with no
+      // further client changes.
+      const dueDate=(live && live.dueDate) ? niceDate(parseDate(live.dueDate))
+        : dueBill ? niceDate(nextDate(dueBill))
+        : a.due;
       const subgrid=`<div class="subgrid" style="margin-top:12px;grid-template-columns:1fr">
           <div><div class="label">Payment due</div><b class="danger">${escHtml(dueDate)}</b></div>
         </div>`;
