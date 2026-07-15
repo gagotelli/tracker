@@ -193,6 +193,16 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
   .debtLegend em{min-width:34px;text-align:right}
 }
 
+.weekChart{display:flex;align-items:flex-end;gap:10px;height:170px;padding-top:8px}
+.weekBar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.weekBar .bar{width:100%;max-width:40px;background:var(--blue);border-radius:6px 6px 0 0}
+.weekBar .amt{font-family:var(--mono);font-size:11px;font-weight:700;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.weekBar .lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+@media(max-width:520px){
+  .weekChart{height:140px;gap:6px}
+  .weekBar .amt{font-size:10px}
+}
+
 /* ===== THIS FORTNIGHT: mobile fit =====
    These tables are narrow by design and must never trigger the card's
    horizontal scroll fallback. */
@@ -539,6 +549,13 @@ const firebaseConfig = {
           <table class="table"><tbody id="fnFixedRows"></tbody></table>
         </div>
 
+      </div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px">
+      <div class="card span12">
+        <h2 class="section-title">SPENDING BY WEEK</h2>
+        <div id="spendChart"><div class="fnSub">Loading spending history…</div></div>
       </div>
     </div>
 
@@ -1412,6 +1429,7 @@ function render(){
     const upcoming=data.bills.map((b,i)=>({...b,i,next:nextDate(b)})).sort((a,b)=>a.next-b.next);
 
     renderFortnight();
+    renderSpendChart();
 
     accounts.innerHTML=data.accounts.map(a=>{
       const live=liveCardAccount(a.name);
@@ -1890,6 +1908,72 @@ function autoSyncBank(){
   window._fns.httpsCallable('syncLatitudeNow')().catch(e=>console.error('auto latitude sync failed', e));
 }
 
+// Full transaction history, from trackers/{uid}/transactions (written by the
+// Cloud Function, up to its WINDOW_DAYS lookback). Unlike bank.recent /
+// latitude.recent this isn't part of the main document snapshot, so it's
+// fetched once here rather than on every render. Requires Firestore rules
+// that also cover this subcollection, not just the parent document; if
+// they don't, this fails closed with a friendly message instead of
+// breaking the rest of the dashboard.
+let spendHistory=null;
+function loadSpendHistory(){
+  if(!window._db || !cloudUser) return;
+  window._db.collection('trackers').doc(cloudUser.uid).collection('transactions')
+    .orderBy('date','asc')
+    .get()
+    .then(snap=>{
+      spendHistory=snap.docs.map(d=>d.data());
+      renderSpendChart();
+    })
+    .catch(e=>{
+      console.error('spend history load failed', e);
+      const box=document.getElementById('spendChart');
+      if(box) box.innerHTML='<div class="fnSub">Couldn\'t load spending history ('+(e.code||e.message)+').</div>';
+    });
+}
+
+// Weekly spending bars, Monday-start buckets, spending only (positive
+// amounts are income and are excluded). Purely a client-side aggregation of
+// whatever loadSpendHistory() already fetched, so this is cheap to call
+// from every render() pass.
+function renderSpendChart(){
+  const box=document.getElementById('spendChart');
+  if(!box) return;
+  if(!Array.isArray(spendHistory)){
+    box.innerHTML='<div class="fnSub">Loading spending history…</div>';
+    return;
+  }
+  if(!spendHistory.length){
+    box.innerHTML='<div class="fnSub">No transaction history yet. Press Sync now on CommBank or Latitude to pull some.</div>';
+    return;
+  }
+  const weekStart=d=>{ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return iso(x); };
+  const buckets={};
+  spendHistory.forEach(t=>{
+    const amt=Number(t.amount)||0;
+    if(amt>=0 || !t.date) return;
+    const wk=weekStart(parseDate(t.date));
+    buckets[wk]=(buckets[wk]||0)+Math.abs(amt);
+  });
+  const weeks=Object.keys(buckets).sort();
+  if(!weeks.length){
+    box.innerHTML='<div class="fnSub">No spending in the synced history yet.</div>';
+    return;
+  }
+  const max=Math.max(...weeks.map(w=>buckets[w]));
+  const bars=weeks.map(w=>{
+    const v=buckets[w];
+    const h=max>0?Math.max(4,Math.round(v/max*100)):4;
+    return `<div class="weekBar">
+      <span class="amt">${money(v)}</span>
+      <div class="bar" style="height:${h}%"></div>
+      <span class="lbl">${shortDate(parseDate(w))}</span>
+    </div>`;
+  }).join('');
+  box.innerHTML=`<div class="weekChart">${bars}</div>
+    <div class="fnSub" style="margin-top:10px">${weeks.length} week${weeks.length===1?'':'s'} of spending across every synced account, from the last 35 days pulled from PocketSmith.</div>`;
+}
+
 function cloudConfigured(){
   return typeof firebase!=='undefined'
     && typeof firebaseConfig!=='undefined'
@@ -2036,6 +2120,7 @@ function initCloud(){
     showAuthOverlay(false);
     toggleSignOut(true, user);
     autoSyncBank();
+    loadSpendHistory();
     const ref=db.collection('trackers').doc(user.uid);
     cloudDocUnsub=ref.onSnapshot(snap=>{
       if(snap.metadata.hasPendingWrites) return; // ignore our own local write echo
