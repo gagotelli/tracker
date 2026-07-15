@@ -9,15 +9,13 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<!-- script-src needs 'unsafe-inline': the whole app is one inline script block plus
-     inline onclick handlers, so a nonce/hash CSP would mean rewriting every handler to
-     addEventListener first. Everything else here is locked to the exact origins this
-     app actually talks to, so this still blocks a stray injected script tag pointing at
-     an outside domain, stops any fetch/XHR from exfiltrating to a random domain, and
-     keeps the page out of iframes it doesn't expect. frame-ancestors is listed for
-     documentation only, browsers ignore it in a meta tag, it has to be a real HTTP
-     header from firebase.json to work. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebaseapp.com; frame-src https://finance-tracker-gg.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';">
+<!-- A Content-Security-Policy was tried here and pulled back out: Firebase Auth's
+     email/password sign-in loads a reCAPTCHA script from apis.google.com and
+     www.google.com, which the policy didn't allow, and the blocked request surfaced
+     to you as "Firebase: Error (auth/internal-error)" on the sign-in screen. Getting
+     every Firebase Auth/Firestore/Functions origin right is fiddly and better done as
+     a real HTTP header in firebase.json, tested against a staging deploy, than as a
+     meta tag guessed against production sign-in. -->
 <title>Finance Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
