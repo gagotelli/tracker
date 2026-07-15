@@ -504,6 +504,11 @@ const firebaseConfig = {
             <div class="fnBig" id="fnSafe">$0.00</div>
             <div class="fnSub"><b id="fnDaily">$0.00</b> a day for <span id="fnDays">14</span> days</div>
           </div>
+          <div>
+            <div class="label">Available balance</div>
+            <div class="value" id="fnAvailable">$0.00</div>
+            <div class="fnSub" id="fnAvailableSub">Personal + cards</div>
+          </div>
           <div class="fnDates">
             <div class="label">Payday</div>
             <b id="fnPayday"></b>
@@ -1126,6 +1131,23 @@ function paymentMatches(desc,name){
   return n.includes(p) || p.includes(n);
 }
 
+// The live-synced account for a card, from whichever feed actually has it
+// (a card can only ever be synced by one of the two, but the caller
+// shouldn't have to know which). Returns null if neither feed has synced
+// yet, so callers can fall back to the manually-entered account.
+function liveCardAccount(name){
+  const inBank=(bank && Array.isArray(bank.accounts)) ? bank.accounts.find(x=>paymentMatches(x.name,name)) : null;
+  const inLat=(latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.find(x=>paymentMatches(x.name,name)) : null;
+  return inBank||inLat||null;
+}
+
+// Your CommBank connection has more than one account under it (a personal
+// transaction account plus others, e.g. a "Bills" holding account) — only
+// the personal one is real spendable cash, so Safe to spend is sourced from
+// it specifically rather than summing every CommBank account together. If
+// PocketSmith shows it under a different name, widen this to match.
+const PERSONAL_ACCOUNT_MATCH=/smart\s*personal/i;
+
 function applyPaymentToBalances(payment){
   const amount=Number(payment.amount)||0;
   if(amount<=0) return;
@@ -1180,10 +1202,24 @@ function getFortnight(){
   });
 
   const salary=Number(data.settings.fortnightlyIncome)||0;
-  const liveCash=(bank && Array.isArray(bank.accounts))
-    ? bank.accounts.filter(a=>Number(a.balance)>0).reduce((s,a)=>s+Number(a.balance),0)
+
+  // Safe to spend is sourced from the personal transaction account
+  // specifically, not every CommBank account added together: a "Bills"
+  // holding account or similar isn't really spendable, so summing
+  // everything would overstate what's actually free to spend.
+  const personalAcct=(bank && Array.isArray(bank.accounts))
+    ? bank.accounts.find(a=>PERSONAL_ACCOUNT_MATCH.test(a.name||''))
     : null;
-  const cash=liveCash!=null?liveCash:(Number(data.settings.cashAvailable)||0);
+  const cash=personalAcct!=null ? Math.max(0,Number(personalAcct.balance)||0) : (Number(data.settings.cashAvailable)||0);
+
+  // Available balance: total spending power, not just cash. Personal
+  // account balance plus whatever headroom is left on every card.
+  const cardsAvailable=data.accounts.reduce((s,a)=>{
+    const live=liveCardAccount(a.name);
+    const balance=live!=null?Math.abs(Number(live.balance)||0):Number(a.balance)||0;
+    return s+Math.max(0,(Number(a.limit)||0)-balance);
+  },0);
+  const availableBalance=cash+cardsAvailable;
 
   // Savings is a target, not a bill. It's shown as a reminder but never
   // subtracted from Safe to spend, what you actually put aside varies
@@ -1194,11 +1230,11 @@ function getFortnight(){
   const cardsPayTotal=cardRows.reduce((s,b)=>s+b.pay,0);
 
   const committed=fixedTotal;
-  // Safe to spend comes from what's actually sitting in your accounts right
-  // now (live CommBank balance via PocketSmith, falling back to the manual
-  // cash figure if the feed hasn't synced), not the salary setting. Salary
-  // alone can't tell you what you've already spent this cycle; the account
-  // balance can. Salary itself is still editable under Your Plan.
+  // Safe to spend comes from what's actually sitting in your personal
+  // account right now (live via PocketSmith, falling back to the manual
+  // cash figure if that account hasn't synced), not the salary setting.
+  // Salary alone can't tell you what you've already spent this cycle; the
+  // account balance can. Salary itself is still editable under Your Plan.
   const safe=cash-committed;
   const daily=safe/14;
 
@@ -1207,7 +1243,8 @@ function getFortnight(){
     .flatMap(b=>dueInstancesInWindow(b,today(),payday))
     .reduce((s,b)=>s+Number(b.amount||0),0);
 
-  return {payday,following,fixed,cardRows,salary,cash,savings,
+  return {payday,following,fixed,cardRows,salary,cash,savings,availableBalance,
+          personalSynced:personalAcct!=null,
           fixedTotal,cardsPayTotal,committed,safe,daily,dueBeforePayday};
 }
 
@@ -1306,6 +1343,9 @@ function renderFortnight(){
   set('fnPayday',niceDate(f.payday));
   set('fnFollowing',niceDate(f.following));
 
+  set('fnAvailable',money(f.availableBalance));
+  set('fnAvailableSub', f.personalSynced ? 'Personal + cards' : 'Personal (not synced) + cards');
+
   const badge=document.getElementById('fnPaydayBadge');
   const d=daysUntil(f.payday);
   if(badge){
@@ -1374,11 +1414,7 @@ function render(){
     renderFortnight();
 
     accounts.innerHTML=data.accounts.map(a=>{
-      // Check both feeds, not just CommBank's, so the Latitude card can also
-      // pick up a live balance and the "synced from PocketSmith" tag.
-      const liveBank=(bank && Array.isArray(bank.accounts)) ? bank.accounts.find(b=>paymentMatches(b.name,a.name)) : null;
-      const liveLat=(latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.find(b=>paymentMatches(b.name,a.name)) : null;
-      const live=liveBank||liveLat;
+      const live=liveCardAccount(a.name);
       const balance=live!=null?Math.abs(Number(live.balance)||0):a.balance;
       const available=Math.max(0,a.limit-balance);
       const u=a.limit?Math.min(100,balance/a.limit*100):0;
