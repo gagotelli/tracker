@@ -1160,10 +1160,14 @@ function liveCardAccount(name){
 
 // Your CommBank connection has more than one account under it (a personal
 // transaction account plus others, e.g. a "Bills" holding account) — only
-// the personal one is real spendable cash, so Safe to spend is sourced from
-// it specifically rather than summing every CommBank account together. If
-// PocketSmith shows it under a different name, widen this to match.
-const PERSONAL_ACCOUNT_MATCH=/smart\s*personal/i;
+// the everyday spendable ones, so Safe to spend is sourced from those
+// specifically rather than summing every CommBank account together (which
+// would also pull in something like a real investment/savings account, if
+// one's ever connected). Currently that's the Bills account (money you top
+// up specifically to cover the bills below, so Safe to spend correctly
+// nets out to what's actually left over) plus a personal account if one
+// matches. Widen this if PocketSmith shows an account under another name.
+const SAFE_CASH_MATCH=/smart\s*personal|\bbills\b/i;
 
 function applyPaymentToBalances(payment){
   const amount=Number(payment.amount)||0;
@@ -1224,10 +1228,12 @@ function getFortnight(){
   // specifically, not every CommBank account added together: a "Bills"
   // holding account or similar isn't really spendable, so summing
   // everything would overstate what's actually free to spend.
-  const personalAcct=(bank && Array.isArray(bank.accounts))
-    ? bank.accounts.find(a=>PERSONAL_ACCOUNT_MATCH.test(a.name||''))
-    : null;
-  const cash=personalAcct!=null ? Math.max(0,Number(personalAcct.balance)||0) : (Number(data.settings.cashAvailable)||0);
+  const safeCashAccts=(bank && Array.isArray(bank.accounts))
+    ? bank.accounts.filter(a=>SAFE_CASH_MATCH.test(a.name||''))
+    : [];
+  const cash=safeCashAccts.length
+    ? safeCashAccts.reduce((s,a)=>s+Math.max(0,Number(a.balance)||0),0)
+    : (Number(data.settings.cashAvailable)||0);
 
   // Available balance: total spending power, not just cash. Personal
   // account balance plus whatever headroom is left on every card.
@@ -1261,7 +1267,7 @@ function getFortnight(){
     .reduce((s,b)=>s+Number(b.amount||0),0);
 
   return {payday,following,fixed,cardRows,salary,cash,savings,availableBalance,
-          personalSynced:personalAcct!=null,
+          personalSynced:safeCashAccts.length>0,
           fixedTotal,cardsPayTotal,committed,safe,daily,dueBeforePayday};
 }
 
@@ -1361,7 +1367,7 @@ function renderFortnight(){
   set('fnFollowing',niceDate(f.following));
 
   set('fnAvailable',money(f.availableBalance));
-  set('fnAvailableSub', f.personalSynced ? 'Personal + cards' : 'Personal (not synced) + cards');
+  set('fnAvailableSub', f.personalSynced ? 'Everyday accounts + cards' : 'Everyday accounts (not synced) + cards');
 
   const badge=document.getElementById('fnPaydayBadge');
   const d=daysUntil(f.payday);
