@@ -526,8 +526,6 @@ const firebaseConfig = {
           </div>
         </div>
 
-        <div id="fnAcctDebug" style="font-size:11px;color:var(--muted);margin-top:10px;word-break:break-word"></div>
-
         <div class="acctMetrics" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
           <div class="metric">
             <div class="label">Bills &amp; fixed</div>
@@ -1169,7 +1167,7 @@ function liveCardAccount(name){
 // up specifically to cover the bills below, so Safe to spend correctly
 // nets out to what's actually left over) plus a personal account if one
 // matches. Widen this if PocketSmith shows an account under another name.
-const SAFE_CASH_MATCH=/smart\s*personal|\bbills\b/i;
+const SAFE_CASH_MATCH=/\bpersonal\b|\bbills\b/i;
 
 function applyPaymentToBalances(payment){
   const amount=Number(payment.amount)||0;
@@ -1370,17 +1368,6 @@ function renderFortnight(){
 
   set('fnAvailable',money(f.availableBalance));
   set('fnAvailableSub', f.personalSynced ? 'Everyday accounts + cards' : 'Everyday accounts (not synced) + cards');
-
-  // TEMPORARY DEBUG, remove once SAFE_CASH_MATCH is confirmed correct: lists
-  // every CommBank account name PocketSmith actually returns, so the real
-  // everyday-spending account name can be added to the match pattern
-  // instead of guessed at again.
-  const dbg=document.getElementById('fnAcctDebug');
-  if(dbg){
-    dbg.textContent = (bank && Array.isArray(bank.accounts) && bank.accounts.length)
-      ? 'DEBUG accounts: '+bank.accounts.map(a=>a.name+' ('+money(a.balance)+')').join(', ')
-      : 'DEBUG: no bank.accounts synced yet';
-  }
 
   const badge=document.getElementById('fnPaydayBadge');
   const d=daysUntil(f.payday);
@@ -1976,11 +1963,23 @@ function renderSpendChart(){
     box.innerHTML='<div class="fnSub">No transaction history yet. Press Sync now on CommBank or Latitude to pull some.</div>';
     return;
   }
+  // trackers/{uid}/transactions holds every PocketSmith-connected account,
+  // including ones deliberately left out of the CommBank/Latitude split
+  // (like a third "Spending (Up)" account) and any transfers between your
+  // own accounts, which aren't real spending. Only count transactions from
+  // accounts actually classified as CommBank or Latitude, the same set the
+  // rest of the dashboard uses, so this can't quietly include money moved
+  // between your own accounts or a connection the app doesn't track.
+  const knownIds=new Set([
+    ...((bank && Array.isArray(bank.accounts)) ? bank.accounts.map(a=>a.id) : []),
+    ...((latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.map(a=>a.id) : [])
+  ]);
   const weekStart=d=>{ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return iso(x); };
   const buckets={};
   spendHistory.forEach(t=>{
     const amt=Number(t.amount)||0;
     if(amt>=0 || !t.date) return;
+    if(t.accountId!=null && knownIds.size && !knownIds.has(t.accountId)) return;
     const wk=weekStart(parseDate(t.date));
     buckets[wk]=(buckets[wk]||0)+Math.abs(amt);
   });
