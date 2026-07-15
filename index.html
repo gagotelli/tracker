@@ -1922,19 +1922,25 @@ function autoSyncBank(){
 // they don't, this fails closed with a friendly message instead of
 // breaking the rest of the dashboard.
 let spendHistory=null;
+let spendHistoryError=null;
 function loadSpendHistory(){
-  if(!window._db || !cloudUser) return;
+  if(!window._db || !cloudUser){
+    spendHistoryError='Not signed in yet.';
+    renderSpendChart();
+    return;
+  }
   window._db.collection('trackers').doc(cloudUser.uid).collection('transactions')
     .orderBy('date','asc')
     .get()
     .then(snap=>{
+      spendHistoryError=null;
       spendHistory=snap.docs.map(d=>d.data());
       renderSpendChart();
     })
     .catch(e=>{
       console.error('spend history load failed', e);
-      const box=document.getElementById('spendChart');
-      if(box) box.innerHTML='<div class="fnSub">Couldn\'t load spending history ('+(e.code||e.message)+').</div>';
+      spendHistoryError=(e.code||e.message||'unknown error');
+      renderSpendChart();
     });
 }
 
@@ -1945,6 +1951,10 @@ function loadSpendHistory(){
 function renderSpendChart(){
   const box=document.getElementById('spendChart');
   if(!box) return;
+  if(spendHistoryError){
+    box.innerHTML='<div class="fnSub">Couldn\'t load spending history ('+escHtml(spendHistoryError)+').</div>';
+    return;
+  }
   if(!Array.isArray(spendHistory)){
     box.innerHTML='<div class="fnSub">Loading spending history…</div>';
     return;
