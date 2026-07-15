@@ -1997,7 +1997,11 @@ function renderSpendChart(){
     if(!buckets[wk]) buckets[wk]={bank:0,lat:0};
     buckets[wk][isBank?'bank':'lat']+=Math.abs(amt);
   });
-  const weekKeys=Object.keys(buckets).sort();
+  // Most recent 12 weeks. How much history actually exists here depends on
+  // how far back the Cloud Function pulls transactions from PocketSmith
+  // (WINDOW_DAYS) and how long syncing has been running - this just caps
+  // the display so it never grows unbounded as more accumulates over time.
+  const weekKeys=Object.keys(buckets).sort().slice(-12);
   if(!weekKeys.length){
     box.innerHTML='<div class="fnSub">No spending in the synced history yet.</div>';
     return;

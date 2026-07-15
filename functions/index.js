@@ -29,7 +29,7 @@ const OWNER_UID = defineSecret("OWNER_UID");
 
 const REGION = "australia-southeast1";
 const API = "https://api.pocketsmith.com/v2";
-const WINDOW_DAYS = 35;      // how far back to pull transactions
+const WINDOW_DAYS = 91;      // how far back to pull transactions (~13 weeks, covers the 12-week spending chart)
 const RECENT_COUNT = 12;     // how many to surface on the dashboard
 
 // Both patterns are matched explicitly now. Previously only Latitude was
