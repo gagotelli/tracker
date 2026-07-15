@@ -2047,7 +2047,23 @@ function renderSpendChart(){
       <span><i class="dot" style="background:#2f77d0"></i>CommBank</span>
       <span><i class="dot" style="background:#8e35b8"></i>Latitude</span>
     </div>
-    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>`;
+    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>
+    <div id="spendDebug" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"></div>`;
+
+  // TEMPORARY DEBUG, remove once the bad transaction is identified and
+  // excluded: lists the individual transactions behind the single biggest
+  // Latitude week, largest first, so the exact one can be pointed at
+  // instead of guessed at.
+  const peak=rows.slice().sort((a,b)=>b.lat-a.lat)[0];
+  const dbg=document.getElementById('spendDebug');
+  if(dbg && peak && peak.lat>0){
+    const peakEnd=new Date(parseDate(peak.wk)); peakEnd.setDate(peakEnd.getDate()+6);
+    const txns=spendHistory
+      .filter(t=>Number(t.amount)<0 && latIds.has(t.accountId) && t.date>=peak.wk && t.date<=iso(peakEnd))
+      .sort((a,b)=>a.amount-b.amount);
+    dbg.innerHTML='<div class="fnSub" style="margin-bottom:6px">DEBUG — Latitude transactions for week of '+shortDate(parseDate(peak.wk))+':</div>'
+      + txns.map(t=>`<div class="fnSub">${escHtml(t.date)} · ${escHtml(t.payee||'(no payee)')} · ${money(t.amount)} · id ${escHtml(String(t.id))}</div>`).join('');
+  }
 }
 
 function cloudConfigured(){
