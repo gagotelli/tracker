@@ -526,6 +526,8 @@ const firebaseConfig = {
           </div>
         </div>
 
+        <div id="fnAcctDebug" style="font-size:11px;color:var(--muted);margin-top:10px;word-break:break-word"></div>
+
         <div class="acctMetrics" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
           <div class="metric">
             <div class="label">Bills &amp; fixed</div>
@@ -1368,6 +1370,17 @@ function renderFortnight(){
 
   set('fnAvailable',money(f.availableBalance));
   set('fnAvailableSub', f.personalSynced ? 'Everyday accounts + cards' : 'Everyday accounts (not synced) + cards');
+
+  // TEMPORARY DEBUG, remove once SAFE_CASH_MATCH is confirmed correct: lists
+  // every CommBank account name PocketSmith actually returns, so the real
+  // everyday-spending account name can be added to the match pattern
+  // instead of guessed at again.
+  const dbg=document.getElementById('fnAcctDebug');
+  if(dbg){
+    dbg.textContent = (bank && Array.isArray(bank.accounts) && bank.accounts.length)
+      ? 'DEBUG accounts: '+bank.accounts.map(a=>a.name+' ('+money(a.balance)+')').join(', ')
+      : 'DEBUG: no bank.accounts synced yet';
+  }
 
   const badge=document.getElementById('fnPaydayBadge');
   const d=daysUntil(f.payday);
