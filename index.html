@@ -689,13 +689,6 @@ const firebaseConfig = {
                 <option value="#14b8a6">Teal</option>
               </select>
             </label>
-            <label>Icon
-              <select id="newCardIcon">
-                <option>💳</option>
-                <option>🔷</option>
-                <option>💰</option>
-              </select>
-            </label>
           </div>
           <div class="actions">
             <button class="btn" id="addCardSave" onclick="saveCardItem()">Add card</button>
@@ -919,6 +912,22 @@ const LEDGER_LOGO = {
   commbank: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2f77d0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><line x1="2.5" y1="9.6" x2="21.5" y2="9.6"/><line x1="5" y1="14.8" x2="9.5" y2="14.8"/></svg>',
   latitude: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8e35b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><line x1="2.5" y1="9.6" x2="21.5" y2="9.6"/><line x1="5" y1="14.8" x2="9.5" y2="14.8"/></svg>'
 };
+
+// The card icon is now always this same outline, coloured by the card's own
+// colour swatch, instead of a stored logo that could be an emoji for some
+// cards and the ledger SVG for others depending on when each was last
+// edited (which is exactly why CommBank and Latitude used to look
+// inconsistent - editing a card reset it to an emoji icon). One shape,
+// every card, always in sync with its own colour.
+function cardIconSvg(color){
+  return `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><line x1="2.5" y1="9.6" x2="21.5" y2="9.6"/><line x1="5" y1="14.8" x2="9.5" y2="14.8"/></svg>`;
+}
+function defaultCardColor(name){
+  const n=String(name||'').toLowerCase();
+  if(n.includes('commbank') || n.includes('mastercard')) return '#2f77d0';
+  if(n.includes('gem') || n.includes('latitude')) return '#8e35b8';
+  return '#2f77d0';
+}
 function applyV5Fixes(s){
   if(Number(s.migrated) >= 5) return false;
   Object.values(s.profiles || {}).forEach(p=>{
@@ -1457,7 +1466,7 @@ function render(){
           <div><div class="label">Payment due</div><b class="danger">${escHtml(dueDate)}</b></div>
         </div>`;
       return `<div class="card span6">
-        <div class="acctHead"><div class="logo">${a.logo}</div><div class="name">${escHtml(a.name)}</div></div>
+        <div class="acctHead"><div class="logo">${cardIconSvg(a.color||defaultCardColor(a.name))}</div><div class="name">${escHtml(a.name)}</div></div>
         <div class="cardBal">${money(balance)}</div>
         <div class="cardBalLbl">owing of ${money(a.limit)} limit${live!=null?' &middot; synced from PocketSmith':''}</div>
         <div class="progressOuter" style="margin:10px 0 6px"><div class="progressInner" style="width:${u}%"></div></div>
@@ -1718,8 +1727,7 @@ function fillCardForm(v){
   newCardDate.value=v.date||'';
   newCardRepeat.value=v.repeat||'Fortnightly';
   newCardExtra.value=v.extra||'';
-  newCardColor.value=v.color||'#2f77d0';
-  newCardIcon.value=v.icon||'💳';
+  newCardColor.value=v.color||defaultCardColor(v.name);
 }
 
 function editCardItem(i){
@@ -1730,7 +1738,7 @@ function editCardItem(i){
   fillCardForm({
     name:a.name, balance:a.balance, limit:a.limit,
     repayment: bill?bill.amount:a.min, date: bill?bill.date:'', repeat: bill?bill.repeat:'Fortnightly',
-    extra:a.extra, color:a.color, icon: typeof a.logo==='string' && a.logo.length<=4 ? a.logo : '💳'
+    extra:a.extra, color:a.color
   });
   document.getElementById('addCardTitle').textContent='EDIT '+a.name.toUpperCase();
   document.getElementById('addCardSave').textContent='Save changes';
@@ -1755,15 +1763,14 @@ function saveCardItem(){
   const date=newCardDate.value||iso(today());
   const repeat=newCardRepeat.value;
   const extra=Math.max(0,+newCardExtra.value||0);
-  const color=newCardColor.value||'#2f77d0';
-  const icon=newCardIcon.value||'💳';
+  const color=newCardColor.value||defaultCardColor(name);
 
   if(editingCardIndex!=null && data.accounts[editingCardIndex]){
     const oldName=data.accounts[editingCardIndex].name;
     const account=data.accounts[editingCardIndex];
     account.name=name; account.balance=balance; account.min=repayment;
     account.due=niceDate(parseDate(date)); account.limit=limit||balance;
-    account.available=Math.max(0,(limit||balance)-balance); account.color=color; account.logo=icon; account.extra=extra;
+    account.available=Math.max(0,(limit||balance)-balance); account.color=color; account.extra=extra;
 
     const bill=data.bills.find(b=>paymentMatches(b.description,oldName));
     if(bill){ bill.description=name; bill.date=date; bill.amount=repayment; bill.repeat=repeat; }
@@ -1777,7 +1784,7 @@ function saveCardItem(){
     return;
   }
 
-  data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),logo:icon,color,extra});
+  data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),color,extra});
   data.bills.push({description:name,date,amount:repayment,repeat});
 
   cancelEditCard();
