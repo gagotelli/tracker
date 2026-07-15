@@ -124,20 +124,11 @@ canvas{width:100%;height:100%;display:block}
 .bkTxnAmt{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
 .bkTxnAmt.neg{color:var(--red)}
 .bkTxnAmt.pos{color:var(--green)}
-.bkPeriod{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px;padding-top:18px;border-top:1px solid var(--border);min-width:0}
-.bkPeriod>div{min-width:0}
-.bkPeriod .label{margin-bottom:5px}
-.bkPeriod b{display:block;font-family:var(--mono);font-weight:700;font-size:19px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
-.bkPeriod b.pos{color:var(--green)}
-.bkPeriod b.neg{color:var(--red)}
-.bkRange{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;margin-top:14px}
 .bkEmpty{color:var(--muted);font-size:14px;padding:8px 0}
 @media(max-width:820px){
   .bkCols{grid-template-columns:1fr;gap:8px}
-  .bkPeriod{grid-template-columns:1fr 1fr;gap:18px 14px}
 }
 @media(max-width:420px){
-  .bkPeriod b{font-size:16px}
   .bkTotal .bkFig{font-size:19px}
 }
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
@@ -579,13 +570,6 @@ const firebaseConfig = {
             </div>
           </div>
 
-          <div class="bkPeriod">
-            <div><div class="label">Earning</div><b class="pos" id="bkEarning">$0.00</b></div>
-            <div><div class="label">Spending</div><b class="neg" id="bkSpending">$0.00</b></div>
-            <div><div class="label">Difference</div><b id="bkDiff">$0.00</b></div>
-            <div><div class="label">Savings rate</div><b id="bkRate">0%</b></div>
-          </div>
-          <div class="bkRange" id="bkRange"></div>
         </div>
 
         <div id="bkMsg" class="notice" style="display:none"></div>
@@ -619,13 +603,6 @@ const firebaseConfig = {
             </div>
           </div>
 
-          <div class="bkPeriod">
-            <div><div class="label">Earning</div><b class="pos" id="ltEarning">$0.00</b></div>
-            <div><div class="label">Spending</div><b class="neg" id="ltSpending">$0.00</b></div>
-            <div><div class="label">Difference</div><b id="ltDiff">$0.00</b></div>
-            <div><div class="label">Savings rate</div><b id="ltRate">0%</b></div>
-          </div>
-          <div class="bkRange" id="ltRange"></div>
         </div>
 
         <div id="ltMsg" class="notice" style="display:none"></div>
@@ -1248,18 +1225,6 @@ function renderFeedPanel(feed, ids, feedLabel){
     document.getElementById(ids.txns).innerHTML=html;
   }
 
-  // Period summary, computed server side so the browser reads one document.
-  const s=feed.summary||{};
-  const set=(id,v,cls)=>{const e=document.getElementById(id); if(!e) return; e.textContent=v; if(cls!==undefined) e.className=cls;};
-  set(ids.earning, money(s.earning||0), 'pos');
-  set(ids.spending, money(s.spending||0), 'neg');
-  const diff=Number(s.difference||0);
-  set(ids.diff, signedMoney(diff), diff<0?'neg':'pos');
-  set(ids.rate, (Number(s.savingsRate||0)).toFixed(2)+'%', diff<0?'neg':'pos');
-
-  document.getElementById(ids.range).textContent =
-    (s.from&&s.to) ? 'Transactions for '+s.from+' to '+s.to : '';
-
   // Last synced, and shout if the feed has gone quiet.
   const ms=feed.lastSync && feed.lastSync.toMillis ? feed.lastSync.toMillis()
          : (typeof feed.lastSync==='number' ? feed.lastSync : 0);
@@ -1272,8 +1237,8 @@ function renderFeedPanel(feed, ids, feedLabel){
   }
 }
 
-const BK_IDS={body:'bkBody',msg:'bkMsg',synced:'bkSynced',accounts:'bkAccounts',total:'bkTotal',txns:'bkTxns',earning:'bkEarning',spending:'bkSpending',diff:'bkDiff',rate:'bkRate',range:'bkRange'};
-const LT_IDS={body:'ltBody',msg:'ltMsg',synced:'ltSynced',accounts:'ltAccounts',total:'ltTotal',txns:'ltTxns',earning:'ltEarning',spending:'ltSpending',diff:'ltDiff',rate:'ltRate',range:'ltRange'};
+const BK_IDS={body:'bkBody',msg:'bkMsg',synced:'bkSynced',accounts:'bkAccounts',total:'bkTotal',txns:'bkTxns'};
+const LT_IDS={body:'ltBody',msg:'ltMsg',synced:'ltSynced',accounts:'ltAccounts',total:'ltTotal',txns:'ltTxns'};
 
 function renderBank(){ renderFeedPanel(bank, BK_IDS, 'CommBank'); }
 function renderLatitude(){ renderFeedPanel(latitude, LT_IDS, 'Latitude'); }
