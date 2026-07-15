@@ -1,0 +1,2122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-store" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finance Tracker">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<!-- script-src needs 'unsafe-inline': the whole app is one inline script block plus
+     inline onclick handlers, so a nonce/hash CSP would mean rewriting every handler to
+     addEventListener first. Everything else here is locked to the exact origins this
+     app actually talks to, so this still blocks a stray injected script tag pointing at
+     an outside domain, stops any fetch/XHR from exfiltrating to a random domain, and
+     keeps the page out of iframes it doesn't expect. frame-ancestors is listed for
+     documentation only, browsers ignore it in a meta tag, it has to be a real HTTP
+     header from firebase.json to work. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebaseapp.com; frame-src https://finance-tracker-gg.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';">
+<title>Finance Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#0f1729;
+  --muted:#6b7484;
+  --border:#e7e9f1;
+  --soft:#f3f5fa;
+  --accent:#22306a;
+  --accentText:#ffffff;
+  --blue:#3b6fd4;--purple:#7c4bd0;--green:#15a05a;--red:#d64040;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06);
+  --ui:'Inter',system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  --mono:'Inter',system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{overflow-x:hidden}
+body{margin:0;font-family:var(--ui);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden;max-width:100vw}
+header{background:var(--card);color:var(--text);border-bottom:1px solid var(--border);padding:14px 24px 0;display:block;position:sticky;top:0;z-index:10}
+.hdrTop{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.hdrBrand{display:flex;align-items:baseline;gap:12px;min-width:0}
+h1{font-size:19px;margin:0;font-weight:800;letter-spacing:-.01em}
+.updated{font-weight:600;color:var(--muted);font-size:13px}
+.headerActions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.themeSelect{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:var(--mono);font-size:11px;letter-spacing:.06em;cursor:pointer}
+
+/* ===== LEDGER BUTTONS: monochrome, mono type, hairline rules ===== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1px solid var(--text);border-radius:8px;
+  padding:12px 18px;line-height:1;
+  background:var(--text);color:var(--card);
+  font-family:var(--mono);font-weight:400;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;
+  cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+}
+.btn:hover{background:transparent;color:var(--text)}
+.btn.secondary{background:transparent;color:var(--muted);border-color:var(--border)}
+.btn.secondary:hover{background:transparent;color:var(--text);border-color:var(--text)}
+.btn.danger{background:transparent;color:var(--red);border-color:var(--red)}
+.btn.danger:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.table .btn{padding:8px 12px;font-size:10px;letter-spacing:.08em}
+.actions{align-items:center}
+.wrap{padding:22px;max-width:1180px;margin:auto}
+.tabs{display:flex;gap:26px;margin:14px 0 -1px;padding:0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.acctTheme{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 10px;font-size:14px;color:var(--text)}
+.acctTheme .themeSelect{padding:6px 10px;font-size:11px;border-radius:8px}
+.tab{white-space:nowrap;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:0 0 12px;margin:0;color:var(--muted);font-family:var(--mono);font-weight:400;font-size:11px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:color .15s,border-color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.page{display:none}.page.active{display:block}
+.section-title{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 16px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:var(--shadow)}
+.span4{grid-column:span 4}.span6{grid-column:span 6}.span12{grid-column:span 12}
+.kpiGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow)}
+.kpi .big{font-size:28px;font-weight:800;margin-top:8px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.account{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.logo{width:46px;height:46px;border-radius:10px;background:var(--soft);display:grid;place-items:center;font-size:24px}
+.name{font-weight:800;font-size:16px}.number{color:var(--muted);margin-top:6px;font-size:14px}
+.metric{border-left:1px solid var(--border);padding-left:22px;min-width:140px}
+.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.value{font-size:22px;font-weight:800;margin-top:7px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.danger{color:var(--red)}.success{color:var(--green)}.warn{color:#b77900}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--border);margin-top:18px;padding-top:16px}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:13px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;font-variant-numeric:tabular-nums}
+.table th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.table tbody tr:last-child td{border-bottom:0}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.summary div{background:var(--soft);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center}
+.summary strong{display:block;font-size:20px;color:var(--text);margin-top:8px;font-variant-numeric:tabular-nums}
+.chartBox{height:230px;position:relative}
+canvas{width:100%;height:100%;display:block}
+.legend-row{display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:11px 0;gap:8px}
+.dot{width:12px;height:12px;border-radius:99px;display:inline-block;margin-right:8px}
+.notice{background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:13px 16px;margin-top:16px;font-size:14px;color:var(--muted)}
+
+/* CommBank live feed card */
+.bkHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}
+.bkHead .section-title{margin:0}
+.bkSynced{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--muted)}
+.bkSynced.stale{color:var(--red)}
+.bkCols{display:grid;grid-template-columns:1fr 1fr;gap:26px;min-width:0}
+.bkCols>div{min-width:0}
+.bkAcct{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);min-width:0}
+.bkAcctName{font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bkAcctSub{display:block;font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.04em;font-family:var(--mono)}
+.bkFig{font-family:var(--mono);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.bkFig.neg{color:var(--red)}
+.bkFig.pos{color:var(--text)}
+.bkTotal{display:flex;justify-content:space-between;align-items:baseline;padding-top:14px;margin-top:2px;min-width:0}
+.bkTotal .bkFig{font-size:22px;letter-spacing:-.02em}
+.bkDay{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);background:var(--soft);padding:6px 9px;border-radius:6px;margin:14px 0 4px}
+.bkTxn{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border);min-width:0}
+.bkTxn:last-child{border-bottom:0}
+.bkTxnPayee{font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bkTxnAmt{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0}
+.bkTxnAmt.neg{color:var(--red)}
+.bkTxnAmt.pos{color:var(--green)}
+.bkPeriod{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px;padding-top:18px;border-top:1px solid var(--border);min-width:0}
+.bkPeriod>div{min-width:0}
+.bkPeriod .label{margin-bottom:5px}
+.bkPeriod b{display:block;font-family:var(--mono);font-weight:700;font-size:19px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.bkPeriod b.pos{color:var(--green)}
+.bkPeriod b.neg{color:var(--red)}
+.bkRange{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;margin-top:14px}
+.bkEmpty{color:var(--muted);font-size:14px;padding:8px 0}
+@media(max-width:820px){
+  .bkCols{grid-template-columns:1fr;gap:8px}
+  .bkPeriod{grid-template-columns:1fr 1fr;gap:18px 14px}
+}
+@media(max-width:420px){
+  .bkPeriod b{font-size:16px}
+  .bkTotal .bkFig{font-size:19px}
+}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.pill{border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;display:inline-block}
+.soon{background:#fff3cd;color:#8a5a00}.overdue{background:#fde8e8;color:#b42323}.ok{background:#e7f7ec;color:#137333}
+dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow:0 24px 60px rgba(16,24,40,.3)}dialog::backdrop{background:rgba(15,23,41,.4)}
+.form{display:grid;gap:12px}.form input,.form select,input,select{padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text)}
+.profileBox{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.profileBox label{font-weight:600;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.profileBox input,.profileBox select{margin-top:7px;width:100%}
+.profileSwitch{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.profileBtn{border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:999px;padding:9px 15px;font-weight:700;cursor:pointer}
+.profileBtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.progressOuter{height:12px;background:var(--soft);border-radius:999px;overflow:hidden;margin-top:10px}
+.progressInner{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:999px;width:0%}
+.paydayCards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:16px}
+
+/* ===== THIS FORTNIGHT ===== */
+.fnHead{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.fnBadge{font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:var(--green);color:#fff;font-weight:600}
+.fnBadge.idle{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.fnHero{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.fnBig{font-family:var(--mono);font-weight:700;font-size:34px;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.fnBig.danger{color:var(--red)}
+.fnSub{font-size:13px;color:var(--muted);margin-top:6px}
+.fnSub b{font-family:var(--mono);color:var(--text)}
+.fnDates{text-align:right}
+.fnDates b{font-family:var(--mono);font-size:15px}
+.fnBar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--border);margin-bottom:10px}
+.fnSeg{height:100%}
+.fnFixed{background:var(--blue)} .fnCards{background:var(--purple)}
+.fnSave{background:#b77900} .fnFree{background:var(--green)}
+.fnLegend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-bottom:18px;align-items:center}
+.fnLegend b{font-family:var(--mono);color:var(--text);margin-left:4px}
+.fnLegend .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.fnOf{margin-left:auto}
+.fnGroup{margin-top:18px}
+.fnGroupHead{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:600;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.fnGroupHead b{font-family:var(--mono);color:var(--muted);font-weight:400}
+.fnDue{font-size:12px;color:var(--muted)}
+.fnDue.soon{color:var(--red);font-weight:600}
+.fnExtra{font-size:11px;color:var(--muted);display:block}
+.fnSettings{margin-top:22px;border-top:1px solid var(--border);padding-top:12px}
+.fnSettings summary{cursor:pointer;font-size:13px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.fnHelp{font-size:13px;color:var(--muted);margin:10px 0 0;line-height:1.45;max-width:70ch}
+.fnSubhead{font-size:13px;font-weight:600;margin:20px 0 0;padding-top:14px;border-top:1px solid var(--border)}
+.fnHint{display:block;margin-top:5px;font-size:11px;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none}
+.fnHint.bad{color:var(--red)}
+.fnCheck{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted);cursor:pointer}
+.fnCheck input{width:16px;height:16px;accent-color:var(--text);margin:0;cursor:pointer}
+.cardBal{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:-.02em;margin-top:12px;font-variant-numeric:tabular-nums}
+.cardBalLbl{font-size:12px;color:var(--muted);margin-top:3px}
+.cardUtil{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted)}
+.cardUtil b{font-family:var(--mono)}
+.loanTop{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.loanPct{text-align:right}
+.loanPct b{display:block;font-family:var(--mono);font-size:24px;font-weight:700;color:var(--green)}
+.loanPct span{font-size:12px;color:var(--muted)}
+.loanPct b.muted{color:var(--muted)}
+.debtBar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--border);margin:14px 0 10px;gap:2px}
+.debtSeg{height:100%}
+.debtLegend{display:flex;flex-direction:column;gap:10px;font-size:12px;color:var(--muted)}
+.debtRow span{display:flex;align-items:center}
+.debtLegend .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;flex-shrink:0}
+.debtLegend b{font-family:var(--mono);color:var(--text);margin-left:6px;font-weight:700}
+.debtLegend em{font-style:normal;font-family:var(--mono);margin-left:6px;color:var(--muted)}
+.debtRowSub{margin:3px 0 0 15px}
+@media(max-width:640px){
+  .debtRow span b{margin-left:auto}
+  .debtLegend em{min-width:34px;text-align:right}
+}
+
+/* ===== THIS FORTNIGHT: mobile fit =====
+   These tables are narrow by design and must never trigger the card's
+   horizontal scroll fallback. */
+.card.fnCard{overflow-x:visible}
+.fnCard .table{min-width:0;width:100%}
+.fnCard .table td,.fnCard .table th{overflow-wrap:anywhere}
+.fnMinMobile{display:none}
+.onlyMobile{display:none}
+
+@media(max-width:900px){
+  .fnCard{padding:16px 14px}
+  .fnHero{flex-direction:column;gap:14px;align-items:stretch}
+  .fnDates{text-align:left}
+  .fnBig{font-size:30px}
+  .fnLegend{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:11px}
+  .fnLegend b{display:block;margin-left:14px}
+  .fnOf{margin-left:0;grid-column:1/-1;padding-top:2px;border-top:1px solid var(--border)}
+  .fnOf b{display:inline;margin-left:4px}
+  .fnCard .table{font-size:13px}
+  .fnCard .table td,.fnCard .table th{padding:10px 6px}
+  .fnMinMobile{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+  .fnGroupHead{font-size:12px}
+  .fnDue{font-size:11px}
+}
+
+@media(max-width:420px){
+  .fnBig{font-size:26px}
+  .fnCard .table{font-size:12px}
+  .fnCard .table td,.fnCard .table th{padding:9px 4px}
+}
+@media(max-width:640px){ .fnDates{text-align:left} .fnOf{margin-left:0} .fnBig{font-size:28px} }
+.paydayMini{background:var(--soft);border:1px solid var(--border);border-radius:16px;padding:22px;text-align:center}
+.paydayMini .payLabel{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.paydayMini .payValue{margin-top:10px;font-size:28px;font-weight:800;color:var(--text);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+body.theme-dark{--bg:#0b1220;--card:#141d31;--text:#f2f5fa;--muted:#9aa5b8;--border:#26314b;--soft:#1a2540;--accent:#3f5bd6;--accentText:#fff;--shadow:0 1px 2px rgba(0,0,0,.3)}
+body.theme-dark .soon{background:#3a2f10;color:#ffd98a}
+body.theme-dark .overdue{background:#3a1a1a;color:#ffb4b4}
+body.theme-dark .ok{background:#13331f;color:#8ee6ad}
+@media (prefers-color-scheme: dark){
+  body.theme-system{--bg:#0b1220;--card:#141d31;--text:#f2f5fa;--muted:#9aa5b8;--border:#26314b;--soft:#1a2540;--accent:#3f5bd6;--accentText:#fff;--shadow:0 1px 2px rgba(0,0,0,.3)}
+  body.theme-system .soon{background:#3a2f10;color:#ffd98a}
+  body.theme-system .overdue{background:#3a1a1a;color:#ffb4b4}
+  body.theme-system .ok{background:#13331f;color:#8ee6ad}
+}
+@media(max-width:900px){
+  .span4,.span6,.span12{grid-column:span 12}.account{flex-direction:column}.metric{border-left:0;padding-left:0}
+  .chartBox{height:260px}h1{font-size:22px}.table{font-size:14px}.hideMobile{display:none}
+  .kpiGrid,.profileBox,.paydayCards{grid-template-columns:1fr}
+}
+
+/* MOBILE DASHBOARD ORDER FIX */
+@media(max-width:900px){
+  #dashboard.active{
+    display:flex;
+    flex-direction:column;
+  }
+  #dashboard .kpiGrid{
+    order:99;
+    margin-top:16px;
+  }
+}
+
+/* V3 MOBILE REBUILD */
+.card,.kpi,.paydayMini{min-width:0}
+.table{min-width:0}
+.card:has(.table){overflow-x:auto;-webkit-overflow-scrolling:touch}
+input,select,button{font-size:16px}
+
+@media(max-width:900px){
+  body{padding-bottom:12px}
+  header{padding:12px 14px 0}
+  .hdrTop{gap:10px;align-items:center;flex-wrap:nowrap}
+  .hdrBrand{flex:1 1 auto;min-width:0;flex-direction:column;align-items:flex-start;gap:2px}
+  h1{font-size:17px;line-height:1.2;min-width:0}
+  .updated{font-size:11px;opacity:.9}
+  .headerActions{
+    width:auto;
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    gap:8px;
+    flex:0 0 auto;
+  }
+  .wrap{padding:12px}
+  .tabs{
+    gap:20px;
+    margin-top:12px;
+  }
+  .tab{
+    padding:0 0 11px;
+    font-size:10px;
+    letter-spacing:.1em;
+  }
+  .card{padding:14px;border-radius:14px}
+  .kpi{padding:14px}
+  .kpi .big,.paydayMini .payValue{font-size:21px}
+  .summary{grid-template-columns:1fr;gap:10px}
+  .summary div{padding:13px}
+  .account{gap:10px}
+  .metric{min-width:0;width:100%;padding-top:8px;border-top:1px solid var(--border)}
+  .subgrid{grid-template-columns:1fr}
+  .actions{display:grid;grid-template-columns:1fr;gap:8px}
+  .actions .btn{width:100%}
+  .profileBox{grid-template-columns:1fr!important;gap:10px}
+  .notice{padding:11px 12px;font-size:13px;line-height:1.35}
+  .chartBox{height:220px}
+  .table{font-size:13px;min-width:0}
+  .table th,.table td{padding:10px 6px;overflow-wrap:anywhere}
+  .table .btn{padding:7px 9px;font-size:10px;letter-spacing:.06em}
+  .onlyMobile{display:inline}
+  .summary{gap:10px}
+  .actions{gap:8px}
+  .notice{word-break:break-word}
+  .acctDrop{width:min(262px,calc(100vw - 28px));min-width:0}
+}
+
+@media(max-width:420px){
+  h1{font-size:16px}
+  .tabs{gap:16px}
+  .tab{font-size:10px;letter-spacing:.06em;padding:0 0 10px}
+}
+
+.authOverlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:rgba(4,12,28,.62);-webkit-backdrop-filter:blur(10px) saturate(.7);backdrop-filter:blur(10px) saturate(.7);padding:20px}
+
+/* while signed out, blur and lock the app itself so figures are unreadable */
+body.authLocked header,
+body.authLocked .wrap{
+  filter:blur(16px) saturate(.5);
+  -webkit-filter:blur(16px) saturate(.5);
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+@media(prefers-reduced-motion:no-preference){
+  body.authLocked header, body.authLocked .wrap{transition:filter .2s ease}
+}
+.authCard{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:16px;padding:24px;width:min(380px,100%);box-shadow:0 12px 40px rgba(4,12,28,.35);display:flex;flex-direction:column;gap:10px}
+.authCard h2{margin:0;font-size:22px}
+.authCard p{margin:0 0 4px;color:var(--muted);font-size:14px}
+.authCard input{padding:12px;border:1px solid var(--border);border-radius:10px;font-size:16px;background:var(--card);color:var(--text)}
+.authCard .btn{width:100%;padding:12px}
+.authError{color:var(--red);font-size:13px;min-height:18px}
+.acctMenu{position:relative}
+.acctAvatar{width:36px;height:36px;flex:none;border-radius:50%;background:var(--text);color:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--ui);font-weight:700;font-size:14px;text-transform:uppercase;overflow:hidden;cursor:pointer;padding:0;line-height:1}
+.acctAvatar:hover{opacity:.88}
+.acctAvatar.lg{width:44px;height:44px;font-size:17px;cursor:default}
+.acctAvatar img{width:100%;height:100%;object-fit:cover;display:block}
+.acctDrop{display:none;position:absolute;top:calc(100% + 10px);right:0;min-width:262px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 16px 44px rgba(4,12,28,.22);padding:8px;z-index:60}
+.acctDrop.open{display:block}
+.acctDropHead{display:flex;align-items:center;gap:11px;padding:10px 10px 12px}
+.acctDropSep{height:1px;background:var(--border);margin:4px 0}
+.acctMeta{display:flex;flex-direction:column;line-height:1.3;min-width:0}
+.acctName{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acctMail{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acctProv{margin-top:5px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.acctProv::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle}
+.acctItem{display:block;width:100%;text-align:left;background:none;border:0;border-radius:9px;padding:10px;font:inherit;font-size:14px;color:var(--text);cursor:pointer}
+.acctItem:hover{background:var(--bg,rgba(127,127,127,.1))}
+.acctItem.danger{color:var(--red)}
+.acctLbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.acctMsg{font-size:13px;min-height:18px;color:var(--green)}
+.acctMsg.err{color:var(--red)}
+#acctDialog input:disabled{opacity:.65;cursor:not-allowed}
+#acctUidInput{font-family:var(--mono);font-size:12px}
+@media(max-width:420px){ .acctDrop{right:0;left:auto;min-width:0;width:min(262px,calc(100vw - 28px))} }
+.authCard .btn.google{background:transparent;color:var(--text);border-color:var(--border)}
+.authCard .btn.google:hover{background:transparent;color:var(--text);border-color:var(--text)}
+.authCard .btn.google svg{flex:none}
+.authDivider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:2px 0}
+.authDivider::before,.authDivider::after{content:"";flex:1;height:1px;background:var(--border)}
+.cloudWarn{position:fixed;left:0;right:0;bottom:0;z-index:9998;background:#7a2e2e;color:#fff;font-size:13px;padding:10px 14px;text-align:center;display:none}
+
+/* ===== LEDGER LOOK: wordmark + monospace numbers ===== */
+h1#mainTitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:0;font-weight:400;letter-spacing:0}
+h1#mainTitle .mark{font-family:var(--ui);font-weight:800;font-size:23px;letter-spacing:-.02em;color:var(--text);line-height:1}
+h1#mainTitle .submark{font-family:var(--mono);font-weight:400;font-size:12px;letter-spacing:.09em;color:var(--muted);text-transform:uppercase;line-height:1}
+.kpi .big,.big,.value,.metric .value,.summary strong,.paydayMini .payValue,.table b,.subgrid b,.gval,.heroAmt{font-family:var(--mono);font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.table td,.table th{font-variant-numeric:tabular-nums}
+input[type=number],input[type=date]{font-family:var(--mono)}
+.authCard h2{font-family:var(--ui);font-weight:800}
+@media(max-width:420px){
+  h1#mainTitle .mark{font-size:20px}
+  h1#mainTitle .submark{font-size:11px}
+}
+
+/* ===== ACCOUNT CARDS: header + responsive metric grid (no overflow) ===== */
+.acctHead{display:flex;align-items:center;gap:14px;margin-bottom:18px;min-width:0}
+.acctHead .name{font-weight:800;font-size:16px;line-height:1.25;min-width:0;overflow-wrap:anywhere}
+.acctMetrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.acctMetrics .metric{border-left:0;padding-left:0;padding-top:0;border-top:0;min-width:0}
+.acctMetrics .metric+.metric{border-left:1px solid var(--border);padding-left:14px}
+.acctMetrics .value{font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acctMetrics .value.due{font-size:15px}
+@media(max-width:430px){
+  .acctMetrics{gap:10px}
+  .acctMetrics .value{font-size:16px}
+  .acctMetrics .value.due{font-size:13px}
+  .acctMetrics .metric+.metric{padding-left:10px}
+}
+/* ===== DASHBOARD HERO + AT A GLANCE ===== */
+.heroCard{display:flex;flex-direction:column;justify-content:center}
+.heroAmt{font-size:34px;font-weight:800;letter-spacing:-.02em;margin:8px 0 6px}
+.heroDesc{font-size:16px;font-weight:600;color:var(--text)}
+.heroWhen{margin-top:8px;font-size:14px;font-weight:600;color:var(--muted)}
+.heroWhen.warn{color:#b77900}
+.heroWhen.danger{color:var(--red)}
+.heroNext{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--muted)}
+.glanceGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.glance{background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
+.gval{font-size:20px;font-weight:800;margin-top:6px;letter-spacing:-.01em}
+@media(max-width:520px){.heroAmt{font-size:28px}}
+</style>
+<!-- ===== FIREBASE (cloud sync) ===== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<script>
+/* Firebase config for project finance-tracker-gg.
+   These values are public by design in a web app. Security comes from the Firestore rules,
+   which lock /trackers/{userId} to the signed in UID. */
+const firebaseConfig = {
+  apiKey: "AIzaSyDYluEhCkvNs0hpPTHePjSl9YkLOkKtoB0",
+  authDomain: "finance-tracker-gg.firebaseapp.com",
+  projectId: "finance-tracker-gg",
+  storageBucket: "finance-tracker-gg.firebasestorage.app",
+  messagingSenderId: "9590012483",
+  appId: "1:9590012483:web:53538860ddff4167ec72f6"
+};
+</script>
+</head>
+<body class="authLocked">
+<div id="authOverlay" class="authOverlay">
+  <div class="authCard">
+    <h2>Finance Tracker</h2>
+    <p>Sign in to sync your data across devices.</p>
+    <button class="btn google" id="authGoogle">
+      <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/>
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+      </svg>
+      <span>Continue with Google</span>
+    </button>
+    <div class="authDivider"><span>or use email</span></div>
+    <input id="authEmail" type="email" placeholder="Email" autocomplete="username">
+    <input id="authPass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn" id="authSignIn">Sign in</button>
+    <button class="btn secondary" id="authSignUp">Create account</button>
+    <button class="btn secondary" id="authReset">Forgot password</button>
+    <div id="authError" class="authError"></div>
+  </div>
+</div>
+<div id="cloudWarn" class="cloudWarn">Cloud sync is OFF. Firebase config still has PASTE_ placeholders, so this device is saving locally only.</div>
+<header>
+  <div class="hdrTop">
+    <div class="hdrBrand">
+      <h1 id="mainTitle"><span class="submark" id="titleSub">FINANCE-TRACKER-GG</span></h1>
+      <div class="updated">Updated <span id="updated"></span></div>
+    </div>
+    <div class="headerActions">
+      <div class="acctMenu" id="accountBox" style="display:none">
+        <button class="acctAvatar" id="acctBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu">?</button>
+        <div class="acctDrop" id="acctDrop" role="menu">
+          <div class="acctDropHead">
+            <div class="acctAvatar lg" id="acctAvatarLg">?</div>
+            <div class="acctMeta">
+              <span class="acctName" id="acctName"></span>
+              <span class="acctMail" id="acctMail"></span>
+              <span class="acctProv" id="acctProv"></span>
+            </div>
+          </div>
+          <div class="acctDropSep"></div>
+          <div class="acctTheme">
+            <span>Theme</span>
+            <select id="themeSelect" class="themeSelect" onchange="setTheme(this.value)">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">Auto</option>
+            </select>
+          </div>
+          <div class="acctDropSep"></div>
+          <button class="acctItem" id="acctSettings" role="menuitem">Account settings</button>
+          <button class="acctItem" id="acctPwd" role="menuitem">Send password reset</button>
+          <div class="acctDropSep"></div>
+          <button class="acctItem danger" id="signOutBtn" role="menuitem">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" onclick="showTab('dashboard',this)">Dashboard</button>
+    <button class="tab" onclick="showTab('payments',this)">Payments &amp; Setup</button>
+  </nav>
+</header>
+
+<div class="wrap">
+
+  <section id="dashboard" class="page active">
+
+    <div class="grid" style="margin-bottom:16px">
+      <div class="card span12 fnCard">
+        <div class="fnHead">
+          <h2 class="section-title" style="margin:0">THIS FORTNIGHT</h2>
+          <span class="fnBadge" id="fnPaydayBadge"></span>
+        </div>
+
+        <div class="fnHero">
+          <div>
+            <div class="label">Safe to spend</div>
+            <div class="fnBig" id="fnSafe">$0.00</div>
+            <div class="fnSub"><b id="fnDaily">$0.00</b> a day for <span id="fnDays">14</span> days</div>
+          </div>
+          <div class="fnDates">
+            <div class="label">Payday</div>
+            <b id="fnPayday"></b>
+            <div class="fnSub">then <span id="fnFollowing"></span></div>
+          </div>
+        </div>
+
+        <div class="fnBar" id="fnBar">
+          <div class="fnSeg fnFixed"  id="fnBarFixed"></div>
+          <div class="fnSeg fnFree"   id="fnBarFree"></div>
+        </div>
+        <div class="fnLegend">
+          <span><i class="dot fnFixed"></i>Bills &amp; fixed <b id="fnFixedTotal">$0.00</b></span>
+          <span><i class="dot fnFree"></i>Safe <b id="fnFreeTotal">$0.00</b></span>
+          <span class="fnOf">of <b id="fnSalary">$0.00</b></span>
+        </div>
+        <p class="fnHelp" id="fnSavingsHint" style="margin-top:8px"></p>
+
+        <div id="fnWarn" class="notice" style="display:none"></div>
+
+        <div class="fnGroup">
+          <div class="fnGroupHead"><span>Bills and fixed payments</span><b id="fnFixedSub">$0.00</b></div>
+          <table class="table"><tbody id="fnFixedRows"></tbody></table>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px">
+      <div class="card span12">
+        <div class="bkHead">
+          <h2 class="section-title">COMMBANK</h2>
+          <div style="display:flex;align-items:center;gap:14px">
+            <span class="bkSynced" id="bkSynced"></span>
+            <button class="btn secondary" id="bkSyncBtn" type="button">Sync now</button>
+          </div>
+        </div>
+
+        <div id="bkBody">
+          <div class="bkCols">
+            <div>
+              <div class="label" style="margin-bottom:4px">Accounts</div>
+              <div id="bkAccounts"></div>
+              <div class="bkTotal">
+                <span class="label">Total balance</span>
+                <span class="bkFig" id="bkTotal">$0.00</span>
+              </div>
+            </div>
+
+            <div>
+              <div class="label" style="margin-bottom:4px">Recent transactions</div>
+              <div id="bkTxns"></div>
+            </div>
+          </div>
+
+          <div class="bkPeriod">
+            <div><div class="label">Earning</div><b class="pos" id="bkEarning">$0.00</b></div>
+            <div><div class="label">Spending</div><b class="neg" id="bkSpending">$0.00</b></div>
+            <div><div class="label">Difference</div><b id="bkDiff">$0.00</b></div>
+            <div><div class="label">Savings rate</div><b id="bkRate">0%</b></div>
+          </div>
+          <div class="bkRange" id="bkRange"></div>
+        </div>
+
+        <div id="bkMsg" class="notice" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px">
+      <div class="card span12">
+        <div class="bkHead">
+          <h2 class="section-title">LATITUDE GEM VISA</h2>
+          <div style="display:flex;align-items:center;gap:14px">
+            <span class="bkSynced" id="ltSynced"></span>
+            <button class="btn secondary" id="ltSyncBtn" type="button">Sync now</button>
+          </div>
+        </div>
+
+        <div id="ltBody">
+          <div class="bkCols">
+            <div>
+              <div class="label" style="margin-bottom:4px">Accounts</div>
+              <div id="ltAccounts"></div>
+              <div class="bkTotal">
+                <span class="label">Total balance</span>
+                <span class="bkFig" id="ltTotal">$0.00</span>
+              </div>
+            </div>
+
+            <div>
+              <div class="label" style="margin-bottom:4px">Recent transactions</div>
+              <div id="ltTxns"></div>
+            </div>
+          </div>
+
+          <div class="bkPeriod">
+            <div><div class="label">Earning</div><b class="pos" id="ltEarning">$0.00</b></div>
+            <div><div class="label">Spending</div><b class="neg" id="ltSpending">$0.00</b></div>
+            <div><div class="label">Difference</div><b id="ltDiff">$0.00</b></div>
+            <div><div class="label">Savings rate</div><b id="ltRate">0%</b></div>
+          </div>
+          <div class="bkRange" id="ltRange"></div>
+        </div>
+
+        <div id="ltMsg" class="notice" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px">
+      <div class="card span12">
+        <h2 class="section-title">CARDS</h2>
+        <div class="grid" id="accounts"></div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px">
+      <div class="card span12">
+        <h2 class="section-title">MOTORBIKE LOAN</h2>
+        <div id="loanPanel"></div>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-bottom:16px">
+      <div class="card span12">
+        <h2 class="section-title">TOTAL DEBT</h2>
+        <div id="debtPanel"></div>
+      </div>
+    </div>
+
+  </section>
+
+  <section id="payments" class="page">
+    <div class="grid">
+      <div class="card span12">
+        <h2 class="section-title">PAYMENTS</h2>
+        <div class="summary"><div>Due next 14 days<strong id="due14"></strong></div><div>Due next 30 days<strong id="due30"></strong></div></div>
+        <div class="actions"><button class="btn" onclick="openEntry()">Add payment</button></div>
+        <table class="table">
+          <thead><tr><th>Description</th><th>Next Date</th><th class="hideMobile">Days</th><th>Amount</th><th class="hideMobile">Repeat</th><th class="hideMobile">Status</th><th></th></tr></thead>
+          <tbody id="upcomingTable"></tbody>
+        </table>
+        <div class="notice">These are fixed direct debits. Once a due date passes, it rolls forward to the next cycle and updates the matching balance and safe-to-spend automatically, no need to tick anything.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2 class="section-title">YOUR PLAN</h2>
+      <p class="fnHelp">Safe to spend and the dashboard bars are driven by your live account balance and the bills below. Salary is kept for your own reference.</p>
+      <div class="profileBox" style="margin-top:10px">
+        <label>Cash in your account now<input id="setCash" type="number" step="0.01"><span class="fnHint">Used only if the bank feed hasn't synced</span></label>
+        <label>Fortnightly salary<input id="setIncome" type="number" step="0.01"><span class="fnHint">Reference only</span></label>
+        <label>Set aside as savings<input id="setSavings" type="number" step="0.01"><span class="fnHint">Reminder only, not deducted from Safe to spend</span></label>
+        <label>Next payday<input id="setPayday" type="date" readonly title="Calculated from your fortnightly cycle"><span class="fnHint">Calculated automatically</span></label>
+      </div>
+
+      <div class="actions"><button class="btn" onclick="saveProfileSettings()">Save plan</button></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2 class="section-title">MOTORBIKE LOAN</h2>
+      <div class="notice" id="loanSummaryNotice"></div>
+      <details class="fnSettings">
+        <summary>Edit loan details</summary>
+        <div class="profileBox" style="margin-top:14px">
+          <label>Original Loan Amount incl. interest<input id="loanTotalInput" type="number" step="0.01"></label>
+          <label>Amount Already Paid<input id="loanPaidInput" type="number" step="0.01"></label>
+          <label>Remaining Balance<input id="loanRemainingInput" type="number" disabled></label>
+          <label>First Payment Date<input id="loanStartDateInput" type="date"></label>
+          <label>Fortnightly Payment<input id="loanPaymentAmountInput" type="number" step="0.01"></label>
+          <label>Term Months<input id="loanTermMonthsInput" type="number"></label>
+        </div>
+        <div class="actions"><button class="btn" onclick="saveLoanSettings()">Save Motorbike Loan</button></div>
+      </details>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <details class="fnSettings" id="addDebtDetails">
+        <summary>Add a card, loan or debt</summary>
+        <h2 class="section-title" id="addDebtTitle" style="margin-top:14px">ADD A CARD, LOAN OR DEBT</h2>
+        <p class="notice">Use this for mortgage, car loan, personal loan, credit card, or any recurring repayment. It will update the dashboard, debt breakdown, upcoming payments, and put-aside calculator.</p>
+        <div class="profileBox">
+          <label>Type
+            <select id="newDebtType">
+              <option>Credit Card</option>
+              <option>Mortgage</option>
+              <option>Car Loan</option>
+              <option>Personal Loan</option>
+              <option>Other Loan</option>
+            </select>
+          </label>
+          <label>Name<input id="newDebtName" placeholder="Example: Home Mortgage"></label>
+          <label>Current Balance<input id="newDebtBalance" type="number" step="0.01"></label>
+          <label>Limit / Original Loan<input id="newDebtLimit" type="number" step="0.01"></label>
+          <label>Repayment Amount<input id="newDebtRepayment" type="number" step="0.01"></label>
+          <label>Next Repayment Date<input id="newDebtDate" type="date"></label>
+          <label>Repayment Cycle
+            <select id="newDebtRepeat">
+              <option>Fortnightly</option>
+              <option>Monthly</option>
+              <option>Weekly</option>
+              <option>Yearly</option>
+            </select>
+          </label>
+          <label>Colour
+            <select id="newDebtColor">
+              <option value="#2f77d0">Blue</option>
+              <option value="#8e35b8">Purple</option>
+              <option value="#87c64a">Green</option>
+              <option value="#d71920">Red</option>
+              <option value="#f59e0b">Orange</option>
+              <option value="#14b8a6">Teal</option>
+            </select>
+          </label>
+          <label>Icon
+            <select id="newDebtIcon">
+              <option>💳</option>
+              <option>🏠</option>
+              <option>🚗</option>
+              <option>🏍️</option>
+              <option>💰</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn" id="addDebtSave" onclick="saveDebtItem()">Add to profile</button>
+          <button class="btn secondary" id="addDebtCancel" onclick="cancelEditDebt()" hidden>Cancel edit</button>
+        </div>
+      </details>
+    </div>
+
+
+    <div class="card" style="margin-top:16px">
+      <h2 class="section-title">YOUR CARDS AND DEBTS</h2>
+      <table class="table">
+        <thead><tr><th>Name</th><th class="hideMobile">Type</th><th>Balance</th><th class="hideMobile">Repayment</th><th>Next Date</th><th></th></tr></thead>
+        <tbody id="profileDebtsTable"></tbody>
+      </table>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2 class="section-title">DATA</h2>
+      <div class="actions">
+        <button class="btn secondary" onclick="downloadBackup()">Download backup</button>
+        <button class="btn danger" onclick="resetCurrentProfile()">Clear all data</button>
+      </div>
+      <div class="notice">Clearing removes every payment, card, debt and balance. It cannot be undone, so download a backup first.</div>
+    </div>
+  </section>
+
+</div>
+
+<dialog id="entryDialog">
+  <h2 id="entryDialogTitle">Add Payment</h2>
+  <div class="form">
+    <input id="newDesc" placeholder="Description">
+    <input id="newAmount" type="number" step="0.01" placeholder="Amount">
+    <input id="newDate" type="date">
+    <select id="newRepeat"><option>Fortnightly</option><option>Monthly</option><option>Weekly</option><option>Yearly</option></select>
+    <button class="btn" id="entryDialogSave" onclick="saveBillEntry()">Save payment</button>
+    <button class="btn secondary" onclick="entryDialog.close()">Close</button>
+  </div>
+</dialog>
+
+<dialog id="acctDialog">
+  <h2>Account settings</h2>
+  <div class="form">
+    <label class="acctLbl">Display name</label>
+    <input id="acctNameInput" placeholder="Your name">
+    <label class="acctLbl">Email</label>
+    <input id="acctMailInput" disabled>
+    <label class="acctLbl">Signed in with</label>
+    <input id="acctProvInput" disabled>
+    <label class="acctLbl">User ID</label>
+    <input id="acctUidInput" class="mono" disabled>
+    <div id="acctMsg" class="acctMsg"></div>
+    <button class="btn" id="acctSave">Save changes</button>
+    <button class="btn secondary" onclick="acctDialog.close()">Close</button>
+  </div>
+</dialog>
+
+<script>
+const STORE_KEY = 'gftStableProfilesV1';
+// This is a bootstrap template only, used once on first sign-in to seed a brand
+// new Firestore profile (or as a local-only fallback if cloud sync is off). It is
+// never the source of truth once a real trackers/{uid} document exists, so it
+// must never carry real balances, bills or income: this whole object ships in
+// the page source to anyone who requests the URL, signed in or not.
+const seed = {
+  updated:'',
+  accounts:[
+    {name:'CommBank Low Fee Mastercard',balance:0,min:0,due:'',limit:0,available:0,logo:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2f77d0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><line x1="2.5" y1="9.6" x2="21.5" y2="9.6"/><line x1="5" y1="14.8" x2="9.5" y2="14.8"/></svg>'},
+    {name:'Latitude GEM Visa',balance:0,min:0,due:'',limit:0,available:0,logo:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8e35b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><line x1="2.5" y1="9.6" x2="21.5" y2="9.6"/><line x1="5" y1="14.8" x2="9.5" y2="14.8"/></svg>'}
+  ],
+  settings:{cashAvailable:0,fortnightlyIncome:0,emergencyTarget:0,emergencyCurrent:0,nextPayday:''},
+  debts:[
+    {name:'CommBank Mastercard',amount:0,color:'#2f77d0'},
+    {name:'Latitude GEM Visa',amount:0,color:'#8e35b8'},
+    {name:'Motorbike Loan',amount:0,color:'#87c64a'}
+  ],
+  bills:[],
+  loan:{total:0,paid:0,startDate:'',paymentAmount:0,termMonths:60}
+};
+
+// CLOUD is true once real Firebase config is present. In cloud mode the tracker
+// holds no data at rest on the device: nothing is read from or written to
+// localStorage, and nothing renders until Firestore returns the signed in
+// user's document. Offline means an empty tracker, by design.
+const CLOUD = cloudConfigured();
+
+if(CLOUD){
+  // purge any tracker data left behind by the old localStorage-cache build
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+}
+
+// In cloud mode this is an inert placeholder that is never rendered. The real
+// store arrives from the Firestore snapshot after sign in.
+let store = CLOUD
+  ? {active:'Gerardo',profiles:{Gerardo:structuredClone(seed)}}
+  : (JSON.parse(localStorage.getItem(STORE_KEY) || 'null') || {active:'Gerardo',profiles:{Gerardo:structuredClone(seed)}});
+
+// One-time migrations for already-saved data in localStorage.
+// v2: motorbike loan is debited Friday 10 Jul 2026, then fortnightly from that date.
+// v3: Internet Flip $60 on the 20th monthly, Mobile renews 10 Jul monthly,
+//     iCloud renews 29 Jul monthly, Latitude GEM Visa limit is $8,000.
+// v4: repair Latitude data damaged by the old screenshot-sync bug, which
+//     could zero the balance and rewrite the limit. Re-pins limit to $8,000
+//     and restores the last known balance if it was wiped to $0.
+// SECURITY NOTE: the $8,000/$8,192.11 repair values a few lines down are real
+// figures, and this whole function ships in the public page source regardless
+// of whether it ever runs. It's gated on store.migrated < 4, so it's almost
+// certainly a no-op against your real Firestore doc by now (check the
+// `migrated` field on trackers/{uid}: if it's already >= 4, this block and
+// applyV5Fixes/applyV6Fixes below are dead code and safe to delete outright).
+(function migrateStore(){
+  const version = Number(store.migrated) || 0;
+  if(version < 4){
+    Object.values(store.profiles || {}).forEach(p=>{
+      (p.bills || []).forEach(b=>{
+        const desc=String(b.description||'').toLowerCase();
+        if(desc.includes('motorbike')){
+          b.date = '2026-07-10';
+          b.repeat = 'Fortnightly';
+        }
+        if(desc.includes('internet')){
+          b.description = 'Internet Flip';
+          b.amount = 60;
+          b.date = '2026-07-20';
+          b.repeat = 'Monthly';
+        }
+        if(desc.includes('mobile')){
+          b.date = '2026-07-10';
+          b.repeat = 'Monthly';
+        }
+        if(desc.includes('icloud')){
+          b.date = '2026-07-29';
+          b.repeat = 'Monthly';
+        }
+      });
+      (p.accounts || []).forEach(a=>{
+        const n=String(a.name||'').toLowerCase();
+        if(n.includes('gem') || n.includes('latitude')){
+          a.limit = 8000;
+          if(!(Number(a.balance)>0)){
+            // Balance was wiped by the sync bug. Restore the last known
+            // figure. Re-sync from a screenshot for the current amount.
+            a.balance = 8192.11;
+          }
+          a.available = Math.max(0, a.limit - (Number(a.balance)||0));
+          const debt=(p.debts||[]).find(d=>String(d.name||'').toLowerCase().includes('gem')||String(d.name||'').toLowerCase().includes('latitude'));
+          if(debt) debt.amount = a.balance;
+        }
+      });
+    });
+    store.migrated = 4;
+    if(!CLOUD) localStorage.setItem(STORE_KEY, JSON.stringify(store));
+  }
+})();
+
+// v5: real due days are the 13th (CommBank) and 19th (Latitude), not
+// whatever day these bills were originally entered on.
+// v6: flat monochrome outline icons instead of emoji, matching the ledger
+// look of the rest of the app.
+// Both written as standalone functions (not folded into migrateStore above)
+// because in cloud mode the store at boot is just an inert placeholder —
+// these need to run again on the *real* store once it arrives from
+// Firestore, further down in initCloud().
+const LEDGER_LOGO = {
+  commbank: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2f77d0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><line x1="2.5" y1="9.6" x2="21.5" y2="9.6"/><line x1="5" y1="14.8" x2="9.5" y2="14.8"/></svg>',
+  latitude: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#8e35b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"/><line x1="2.5" y1="9.6" x2="21.5" y2="9.6"/><line x1="5" y1="14.8" x2="9.5" y2="14.8"/></svg>'
+};
+function applyV5Fixes(s){
+  if(Number(s.migrated) >= 5) return false;
+  Object.values(s.profiles || {}).forEach(p=>{
+    (p.bills || []).forEach(b=>{
+      const desc=String(b.description||'').toLowerCase();
+      if(desc.includes('commbank') || desc.includes('mastercard')){
+        b.date = '2026-07-13';
+        b.repeat = 'Monthly';
+      }
+      if(desc.includes('gem') || desc.includes('latitude')){
+        b.date = '2026-07-19';
+        b.repeat = 'Monthly';
+      }
+    });
+  });
+  s.migrated = 5;
+  return true;
+}
+function applyV6Fixes(s){
+  if(Number(s.migrated) >= 6) return false;
+  Object.values(s.profiles || {}).forEach(p=>{
+    (p.accounts || []).forEach(a=>{
+      const n=String(a.name||'').toLowerCase();
+      if(n.includes('commbank') || n.includes('mastercard')){
+        a.logo = LEDGER_LOGO.commbank;
+      } else if(n.includes('gem') || n.includes('latitude')){
+        a.logo = LEDGER_LOGO.latitude;
+      }
+    });
+  });
+  s.migrated = 6;
+  return true;
+}
+function applyDataFixes(s){
+  const a=applyV5Fixes(s);
+  const b=applyV6Fixes(s);
+  return a || b;
+}
+applyDataFixes(store);
+if(!CLOUD) localStorage.setItem(STORE_KEY, JSON.stringify(store));
+
+let data = store.profiles[store.active] || structuredClone(seed);
+
+/* Live CommBank feed, written by the syncBank Cloud Function into the same
+   trackers/{uid} document under a top level `bank` field. It deliberately lives
+   outside `store` and outside `data`, so pushToCloud() never serialises it back
+   up and the browser can never clobber what the function wrote. One writer, one
+   reader. Declared here, not down with the cloud code, because render() runs at
+   boot and renderBank() would otherwise hit the temporal dead zone. */
+let bank = null;
+
+// Same idea, second institution: Latitude (GEM Visa) via its own PocketSmith
+// connection, written by a syncLatitudeNow Cloud Function under `latitude`.
+let latitude = null;
+
+const money = n => '$' + Number(n || 0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// Local date helpers. These avoid UTC date shifts on mobile browsers.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PAYDAY_ANCHOR = '2026-06-11'; // Your confirmed payday: Thu 11 Jun 2026.
+
+function today(){
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function parseDate(v){
+  if(!v) return today();
+  const [y,m,d] = String(v).slice(0,10).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function iso(d){
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const y = x.getFullYear();
+  const m = String(x.getMonth()+1).padStart(2,'0');
+  const day = String(x.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function shortDate(d){ return d.getDate()+' '+MON[d.getMonth()]; }
+
+function niceDate(d){
+  return d.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'});
+}
+function todayNice(){ return niceDate(today()); }
+
+function autoNextPayday(fromDate = today()){
+  const anchor = parseDate(PAYDAY_ANCHOR);
+  const current = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+
+  // On 10 Jun 2026, this returns 11 Jun 2026.
+  // On 11 Jun 2026, this still returns 11 Jun 2026.
+  // On 12 Jun 2026, this returns 25 Jun 2026, then every 14 days after.
+  if(current <= anchor) return anchor;
+
+  const diffDays = Math.floor((current - anchor) / DAY_MS);
+  const cycles = Math.ceil(diffDays / 14);
+  const next = new Date(anchor);
+  next.setDate(anchor.getDate() + cycles * 14);
+  return next;
+}
+function syncAutoPayday(){
+  if(!data.settings) data.settings = {};
+  const calculated = iso(autoNextPayday(today()));
+  if(data.settings.nextPayday !== calculated){
+    data.settings.nextPayday = calculated;
+    saveStore();
+  }
+}
+function getLastUpdatedText(){
+  return todayNice();
+}
+function addCycle(d,repeat){ const x=new Date(d); if(repeat==='Weekly')x.setDate(x.getDate()+7); else if(repeat==='Fortnightly')x.setDate(x.getDate()+14); else if(repeat==='Yearly')x.setFullYear(x.getFullYear()+1); else x.setMonth(x.getMonth()+1); return x; }
+
+function dueInstancesInWindow(bill,startDate,endDate){
+  let d=parseDate(bill.date);
+  const out=[];
+  let guard=0;
+  while(d<startDate && guard<300){
+    d=addCycle(d,bill.repeat);
+    guard++;
+  }
+  while(d<=endDate && guard<350){
+    out.push({...bill,next:new Date(d)});
+    d=addCycle(d,bill.repeat);
+    guard++;
+  }
+  return out;
+}
+
+function nextDate(b){ let d=parseDate(b.date); const t=today(); while(d<t) d=addCycle(d,b.repeat); return d; }
+function daysUntil(d){ return Math.round((d-today())/86400000); }
+function normalise(v){ return String(v||'').toLowerCase().replace(/low fee/g,'').replace(/payment/g,'').replace(/[^a-z0-9]+/g,' ').trim(); }
+function status(days){ return days<0?'<span class="pill overdue">Overdue</span>':days<=7?'<span class="pill soon">Soon</span>':'<span class="pill ok">Upcoming</span>'; }
+function saveStore(){ store.profiles[store.active]=data; if(!CLOUD) localStorage.setItem(STORE_KEY,JSON.stringify(store)); pushToCloud(); }
+function save(){ data.updated=getLastUpdatedText(); saveStore(); render(); }
+function showTab(id,btn){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); btn.classList.add('active'); render(); }
+function applyTheme(){ const theme=localStorage.getItem('gftTheme')||'light'; document.body.classList.remove('theme-light','theme-dark','theme-system'); document.body.classList.add('theme-'+theme); themeSelect.value=theme; }
+function setTheme(theme){ localStorage.setItem('gftTheme',theme); applyTheme(); }
+
+function syncFigures(){
+  data.accounts.forEach(a=>{ a.balance=Number(a.balance)||0; a.limit=Number(a.limit)||0; a.min=Number(a.min)||0; a.available=Math.max(0,a.limit-a.balance); });
+  if(!data.loan) data.loan={total:0,paid:0,paymentAmount:0,termMonths:60,startDate:''};
+  data.loan.total=Number(data.loan.total)||0; data.loan.paid=Math.min(Number(data.loan.paid)||0,data.loan.total);
+  const loanRemaining=Math.max(data.loan.total-data.loan.paid,0);
+  const motorDebt=data.debts.find(d=>normalise(d.name).includes('motorbike'));
+  if(motorDebt) motorDebt.amount=loanRemaining;
+  data.debts.forEach(d=>d.amount=Number(d.amount)||0);
+}
+
+function paymentMatches(desc,name){
+  const p=normalise(desc), n=normalise(name);
+  if(p.includes('commbank') && n.includes('commbank')) return true;
+  if(p.includes('mastercard') && n.includes('mastercard')) return true;
+  // 'gem' and 'latitude' are unique to this card. Bare 'visa' isn't, plenty
+  // of debit accounts (including ones on a live bank feed) have 'visa'
+  // somewhere in their name, and matching on that alone was letting an
+  // unrelated live balance silently override this card's real one.
+  if((p.includes('gem')||p.includes('latitude')) && (n.includes('gem')||n.includes('latitude'))) return true;
+  if(p.includes('motorbike') && n.includes('motorbike')) return true;
+  return n.includes(p) || p.includes(n);
+}
+
+function applyPaymentToBalances(payment){
+  const amount=Number(payment.amount)||0;
+  if(amount<=0) return;
+  if(normalise(payment.description).includes('motorbike')){
+    data.loan.paid=Math.min(data.loan.total,(Number(data.loan.paid)||0)+amount);
+    syncFigures();
+    return;
+  }
+  const account=data.accounts.find(a=>paymentMatches(payment.description,a.name));
+  if(account){ account.balance=Math.max(0,account.balance-amount); account.available=Math.max(0,account.limit-account.balance); }
+  const debt=data.debts.find(d=>paymentMatches(payment.description,d.name));
+  if(debt) debt.amount=Math.max(0,debt.amount-amount);
+  syncFigures();
+}
+
+const CARD_WORDS=['commbank','mastercard','gem','visa','latitude'];
+const isCardPayment=d=>CARD_WORDS.some(w=>String(d||'').toLowerCase().includes(w));
+
+// Your existing habit payments, used only until you set your own in Settings.
+const DEFAULT_SAVINGS=270;
+
+// Whether a card's statement minimum is worth tracking. Balance Sync scrapes it,
+// but if a card's minimum is unreliable or you simply don't care, turn it off and
+// the card shows only what you pay. Seed values apply until you save Setup once.
+function defaultMinTracked(desc){
+  const d=String(desc||'').toLowerCase();
+  if(d.includes('commbank')||d.includes('mastercard')) return false;
+  return true;
+}
+function minTracked(desc){
+  const map=data.settings.cardMinTracked||{};
+  return (desc in map) ? !!map[desc] : defaultMinTracked(desc);
+}
+
+function defaultCardPay(desc,minimum){
+  const d=String(desc||'').toLowerCase();
+  if(d.includes('commbank')||d.includes('mastercard')) return 350;
+  if(d.includes('gem')||d.includes('latitude')) return 300;
+  return minimum;
+}
+
+// Single source of truth for the fortnight. Everything on the dashboard reads
+// from this, so the numbers can never disagree with each other again.
+function getFortnight(){
+  const payday=parseDate(data.settings.nextPayday||iso(today()));
+  const cycleStart=new Date(payday);
+  cycleStart.setDate(cycleStart.getDate()-14);
+  const following=new Date(payday);
+  following.setDate(following.getDate()+14);
+
+  // "This fortnight" is the pay cycle you're currently in: your last payday
+  // up to your next one. That's what should be listed under Bills and fixed
+  // payments, so the dates line up with the Payments tab instead of jumping
+  // ahead to the cycle after next.
+  const items=data.bills.flatMap(b=>dueInstancesInWindow(b,cycleStart,payday)).sort((a,b)=>a.next-b.next);
+
+  // Everything due this cycle is committed, rent, subscriptions, the loan,
+  // whatever's on the Payments tab. If a card repayment is ever tracked as
+  // its own bill it lands here too and reduces Safe automatically.
+  const fixed=items;
+
+  // Card items are pulled out separately purely to estimate a payoff date
+  // for the debt panel further down. This total is never subtracted a
+  // second time from Safe, it's already counted above as part of fixed.
+  const plans=data.settings.cardPlans||{};
+  const cardRows=items.filter(b=>isCardPayment(b.description)).map(b=>{
+    const base=Number(b.amount||0);            // the scheduled amount on the bill
+    const tracked=minTracked(b.description);
+    const minimum=tracked?base:null;           // null means "no minimum on file"
+    const saved=Number(plans[b.description]);
+    // Pay whatever's on the bill in the Payments tab, unless you've specifically
+    // overridden this card's repayment amount under Setup -> Card repayments.
+    // No more hidden hardcoded defaults fighting what you actually entered.
+    const pay=Number.isFinite(saved)&&saved>0 ? saved : base;
+    return {...b, minimum, tracked, pay, extra:minimum==null?null:pay-minimum};
+  });
+
+  const salary=Number(data.settings.fortnightlyIncome)||0;
+  const liveCash=(bank && Array.isArray(bank.accounts))
+    ? bank.accounts.filter(a=>Number(a.balance)>0).reduce((s,a)=>s+Number(a.balance),0)
+    : null;
+  const cash=liveCash!=null?liveCash:(Number(data.settings.cashAvailable)||0);
+
+  // Savings is a target, not a bill. It's shown as a reminder but never
+  // subtracted from Safe to spend, what you actually put aside varies
+  // week to week and this app can't commit that money on your behalf.
+  const savings=Number(data.settings.fortnightlySavings ?? DEFAULT_SAVINGS)||0;
+
+  const fixedTotal=fixed.reduce((s,b)=>s+Number(b.amount||0),0);
+  const cardsMinTotal=cardRows.reduce((s,b)=>s+(b.minimum||0),0);
+  const cardsPayTotal=cardRows.reduce((s,b)=>s+b.pay,0);
+
+  const committed=fixedTotal;
+  // Safe to spend comes from what's actually sitting in your accounts right
+  // now (live CommBank balance via PocketSmith, falling back to the manual
+  // cash figure if the feed hasn't synced), not the salary setting. Salary
+  // alone can't tell you what you've already spent this cycle; the account
+  // balance can. Salary itself is still editable under Your Plan.
+  const safe=cash-committed;
+  const daily=safe/14;
+
+  // coverage: anything landing before payday must come out of cash on hand
+  const dueBeforePayday=data.bills
+    .flatMap(b=>dueInstancesInWindow(b,today(),payday))
+    .reduce((s,b)=>s+Number(b.amount||0),0);
+
+  return {payday,following,fixed,cardRows,salary,cash,savings,
+          fixedTotal,cardsMinTotal,cardsPayTotal,committed,safe,daily,dueBeforePayday};
+}
+
+/* PocketSmith reports liabilities as negative. Render them the way the bank
+   does, in brackets, and never Math.abs() them into a positive by accident. */
+const signedMoney = n => {
+  const v=Number(n||0);
+  return v<0 ? '(' + money(Math.abs(v)) + ')' : money(v);
+};
+
+const shortDay = iso => {
+  const d=new Date(iso+'T00:00:00');
+  if(isNaN(d)) return iso;
+  return d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'}).toUpperCase();
+};
+
+function renderFeedPanel(feed, ids, feedLabel){
+  const body=document.getElementById(ids.body);
+  const msg=document.getElementById(ids.msg);
+  const syncedEl=document.getElementById(ids.synced);
+  if(!body||!msg||!syncedEl) return;
+
+  if(!feed || !Array.isArray(feed.accounts) || !feed.accounts.length){
+    body.style.display='none';
+    msg.style.display='block';
+    msg.textContent = CLOUD
+      ? 'No feed data yet. Press Sync now to pull your '+feedLabel+' balances from PocketSmith.'
+      : 'Cloud sync is off, so there is no feed to read.';
+    syncedEl.textContent='';
+    return;
+  }
+  body.style.display='';
+  msg.style.display='none';
+
+  // Accounts. Last four digits only, never the full account number.
+  document.getElementById(ids.accounts).innerHTML = feed.accounts.map(a=>{
+    const tail=String(a.number||'').replace(/\D/g,'').slice(-4);
+    const cls = Number(a.balance)<0 ? 'neg' : 'pos';
+    return '<div class="bkAcct">'
+      + '<span class="bkAcctName">'+escHtml(a.name)
+      + (tail ? '<span class="bkAcctSub">'+tail+'</span>' : '')
+      + '</span>'
+      + '<span class="bkFig '+cls+'">'+signedMoney(a.balance)+'</span>'
+      + '</div>';
+  }).join('');
+
+  const total = feed.accounts.reduce((s,a)=>s+Number(a.balance||0),0);
+  const totalEl=document.getElementById(ids.total);
+  totalEl.textContent=signedMoney(total);
+  totalEl.className='bkFig '+(total<0?'neg':'pos');
+
+  // Recent transactions, grouped under date headers like a statement.
+  const txns=(Array.isArray(feed.recent)?feed.recent:[]).slice(0,10);
+  if(!txns.length){
+    document.getElementById(ids.txns).innerHTML='<div class="bkEmpty">Nothing in the last few days.</div>';
+  } else {
+    let html='', lastDay=null;
+    for(const t of txns){
+      if(t.date!==lastDay){ html+='<div class="bkDay">'+shortDay(t.date)+'</div>'; lastDay=t.date; }
+      const amt=Number(t.amount||0);
+      html+='<div class="bkTxn">'
+        + '<span class="bkTxnPayee">'+escHtml(t.payee||'(no payee)')+'</span>'
+        + '<span class="bkTxnAmt '+(amt<0?'neg':'pos')+'">'+signedMoney(amt)+'</span>'
+        + '</div>';
+    }
+    document.getElementById(ids.txns).innerHTML=html;
+  }
+
+  // Period summary, computed server side so the browser reads one document.
+  const s=feed.summary||{};
+  const set=(id,v,cls)=>{const e=document.getElementById(id); if(!e) return; e.textContent=v; if(cls!==undefined) e.className=cls;};
+  set(ids.earning, money(s.earning||0), 'pos');
+  set(ids.spending, money(s.spending||0), 'neg');
+  const diff=Number(s.difference||0);
+  set(ids.diff, signedMoney(diff), diff<0?'neg':'pos');
+  set(ids.rate, (Number(s.savingsRate||0)).toFixed(2)+'%', diff<0?'neg':'pos');
+
+  document.getElementById(ids.range).textContent =
+    (s.from&&s.to) ? 'Transactions for '+s.from+' to '+s.to : '';
+
+  // Last synced, and shout if the feed has gone quiet.
+  const ms=feed.lastSync && feed.lastSync.toMillis ? feed.lastSync.toMillis()
+         : (typeof feed.lastSync==='number' ? feed.lastSync : 0);
+  if(ms){
+    const hrs=(Date.now()-ms)/36e5;
+    syncedEl.textContent='Last synced '+new Date(ms).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+    syncedEl.classList.toggle('stale', hrs>26);
+  } else {
+    syncedEl.textContent='';
+  }
+}
+
+const BK_IDS={body:'bkBody',msg:'bkMsg',synced:'bkSynced',accounts:'bkAccounts',total:'bkTotal',txns:'bkTxns',earning:'bkEarning',spending:'bkSpending',diff:'bkDiff',rate:'bkRate',range:'bkRange'};
+const LT_IDS={body:'ltBody',msg:'ltMsg',synced:'ltSynced',accounts:'ltAccounts',total:'ltTotal',txns:'ltTxns',earning:'ltEarning',spending:'ltSpending',diff:'ltDiff',rate:'ltRate',range:'ltRange'};
+
+function renderBank(){ renderFeedPanel(bank, BK_IDS, 'CommBank'); }
+function renderLatitude(){ renderFeedPanel(latitude, LT_IDS, 'Latitude'); }
+
+function renderFortnight(){
+  if(!document.getElementById('fnSafe')) return;
+  const f=getFortnight();
+  const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+
+  set('fnSafe',money(f.safe));
+  document.getElementById('fnSafe').className='fnBig'+(f.safe<0?' danger':'');
+  set('fnDaily',money(Math.max(0,f.daily)));
+  set('fnDays','14');
+  set('fnPayday',niceDate(f.payday));
+  set('fnFollowing',niceDate(f.following));
+  set('fnSalary',money(f.cash));
+
+  const badge=document.getElementById('fnPaydayBadge');
+  const d=daysUntil(f.payday);
+  if(badge){
+    badge.textContent = d===0?'Payday today' : d===1?'Payday tomorrow' : 'Payday in '+d+' days';
+    badge.className = d===0?'fnBadge':'fnBadge idle';
+  }
+
+  set('fnFixedTotal',money(f.fixedTotal));
+  set('fnFreeTotal',money(Math.max(0,f.safe)));
+  set('fnFixedSub',money(f.fixedTotal));
+
+  const savingsHint=document.getElementById('fnSavingsHint');
+  if(savingsHint) savingsHint.textContent = f.savings>0
+    ? `Recommended: put aside ${money(f.savings)} this fortnight (not deducted above, it's a target, not a bill).`
+    : '';
+
+  const denom=Math.max(f.cash, f.committed) || 1;
+  const pct=v=>(Math.max(0,v)/denom*100)+'%';
+  const bar=(id,v)=>{const e=document.getElementById(id); if(e) e.style.width=pct(v);};
+  bar('fnBarFixed',f.fixedTotal); bar('fnBarFree',f.safe);
+
+  const dueTag=dt=>{const n=daysUntil(dt); const t=n===0?'today':n===1?'tomorrow':n+'d';
+    return `<span class="fnDue${n<=1?' soon':''}">${shortDate(dt)} &middot; ${t}</span>`;};
+
+  const fx=document.getElementById('fnFixedRows');
+  if(fx) fx.innerHTML=f.fixed.length
+    ? f.fixed.map(b=>`<tr><td>${escHtml(b.description)}</td><td>${dueTag(b.next)}</td><td style="text-align:right"><b>${money(b.amount)}</b></td></tr>`).join('')
+    : '<tr><td colspan="3">Nothing due this fortnight.</td></tr>';
+
+  const warn=document.getElementById('fnWarn');
+  if(warn){
+    if(f.safe<0){
+      warn.style.display='';
+      warn.innerHTML=`This fortnight's bills add up to <b>${money(Math.abs(f.safe))}</b> more than what's in your account.`;
+    } else if(f.dueBeforePayday>0 && f.cash<f.dueBeforePayday){
+      warn.style.display='';
+      warn.innerHTML=`<b>${money(f.dueBeforePayday)}</b> is due before payday but you only have <b>${money(f.cash)}</b> cash available.`;
+    } else {
+      warn.style.display='none';
+    }
+  }
+
+  const box=document.getElementById('fnCardPlanInputs');
+  if(box) box.innerHTML=f.cardRows.map(b=>{
+    const hint = !b.tracked  ? 'Minimum not tracked for this card'
+               : b.extra>0   ? `Minimum ${money(b.minimum)} · paying ${money(b.extra)} extra`
+               : b.extra<0   ? `Below the minimum of ${money(b.minimum)}`
+               :               `Minimum ${money(b.minimum)}`;
+    const bad=(b.extra!=null && b.extra<0) ? ' bad' : '';
+    return `<label>${escHtml(b.description)}
+      <input type="number" step="0.01" data-card="${escAttr(b.description)}" value="${b.pay}">
+      <span class="fnHint${bad}">${hint}</span>
+      <span class="fnCheck"><input type="checkbox" data-mintrack="${escAttr(b.description)}" ${b.tracked?'checked':''}> Track statement minimum</span></label>`;
+  }).join('');
+}
+
+function render(){
+  try{
+    renderBank();
+    renderLatitude();
+    syncAutoPayday();
+    autoRollBills();
+    syncFigures();
+    updated.textContent=getLastUpdatedText();
+    (function(){
+      const _sub=document.getElementById('titleSub');
+      if(_sub){
+        const n=(store.active||'Gerardo').trim();
+        let ini=n.split(/\s+/).map(w=>w[0]||'').join('').toUpperCase();
+        if(ini.length<2) ini=(ini+ini).slice(0,2);
+        _sub.textContent='FINANCE-TRACKER-'+ini;
+      }
+    })();
+
+    const upcoming=data.bills.map((b,i)=>({...b,i,next:nextDate(b)})).sort((a,b)=>a.next-b.next);
+
+    renderFortnight();
+
+    accounts.innerHTML=data.accounts.map(a=>{
+      const live=(bank && Array.isArray(bank.accounts))
+        ? bank.accounts.find(b=>paymentMatches(b.name,a.name))
+        : null;
+      const balance=live!=null?Math.abs(Number(live.balance)||0):a.balance;
+      const available=Math.max(0,a.limit-balance);
+      const u=a.limit?Math.min(100,balance/a.limit*100):0;
+      const klass=u>=90?'danger':u>=70?'warn':'success';
+      const dueBill=data.bills.find(b=>paymentMatches(b.description,a.name));
+      const dueDate=dueBill?niceDate(nextDate(dueBill)):a.due;
+      const subgrid=`<div class="subgrid" style="margin-top:12px;grid-template-columns:1fr">
+          <div><div class="label">Payment due</div><b class="danger">${escHtml(dueDate)}</b></div>
+        </div>`;
+      return `<div class="card span6">
+        <div class="acctHead"><div class="logo">${a.logo}</div><div class="name">${escHtml(a.name)}</div></div>
+        <div class="cardBal">${money(balance)}</div>
+        <div class="cardBalLbl">owing of ${money(a.limit)} limit${live!=null?' &middot; synced from PocketSmith':''}</div>
+        <div class="progressOuter" style="margin:10px 0 6px"><div class="progressInner" style="width:${u}%"></div></div>
+        <div class="cardUtil"><b class="${klass}">${u.toFixed(1)}%</b> used<span>${money(available)} available</span></div>
+        ${subgrid}
+      </div>`;
+    }).join('');
+
+    upcomingTable.innerHTML=upcoming.length
+      ? upcoming.map(b=>{ const days=daysUntil(b.next); const when=days===0?'Today':days===1?'Tomorrow':days+' days'; return `<tr><td><b>${escHtml(b.description)}</b><span class="fnMinMobile">${when} &middot; ${b.repeat}</span></td><td><span class="hideMobile">${niceDate(b.next)}</span><span class="onlyMobile">${shortDate(b.next)}</span></td><td class="hideMobile">${when}</td><td><b>${money(b.amount)}</b></td><td class="hideMobile">${b.repeat}</td><td class="hideMobile">${status(days)}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" onclick="editBill(${b.i})">Edit</button><button class="btn secondary" onclick="deleteBill(${b.i})">Delete</button></td></tr>`; }).join('')
+      : '<tr><td colspan="7">No payments yet. Use Add payment above.</td></tr>';
+    due14.textContent=money(upcoming.filter(b=>daysUntil(b.next)<=14).reduce((s,b)=>s+b.amount,0));
+    due30.textContent=money(upcoming.filter(b=>daysUntil(b.next)<=30).reduce((s,b)=>s+b.amount,0));
+
+
+    (function(){
+      const panel=document.getElementById('loanPanel');
+      if(!panel) return;
+      const total=Number(data.loan.total)||0;
+      const paid=Number(data.loan.paid)||0;
+      const remain=Math.max(total-paid,0);
+      const pct=total>0?Math.min(100,paid/total*100):0;
+      const bike=data.bills.find(b=>String(b.description).toLowerCase().includes('motorbike'));
+      const nextDebit=bike?niceDate(nextDate(bike)):'Not set';
+      panel.innerHTML=`
+        <div class="loanTop">
+          <div>
+            <div class="label">Remaining</div>
+            <div class="fnBig">${money(remain)}</div>
+            <div class="fnSub">${money(paid)} paid of ${money(total)}</div>
+          </div>
+          <div class="loanPct"><b>${pct.toFixed(1)}%</b><span>paid off</span></div>
+        </div>
+        <div class="progressOuter" style="margin:14px 0 6px"><div class="progressInner" style="width:${pct}%"></div></div>
+        <div class="subgrid" style="margin-top:14px">
+          <div><div class="label">Fortnightly payment</div><b>${money(data.loan.paymentAmount)}</b></div>
+          <div><div class="label">Next debit</div><b>${nextDebit}</b></div>
+        </div>`;
+    })();
+
+    (function(){
+      const panel=document.getElementById('debtPanel');
+      if(!panel) return;
+      const debts=(data.debts||[]).filter(d=>Number(d.amount)>0).sort((a,b)=>b.amount-a.amount);
+      const total=debts.reduce((s,d)=>s+Number(d.amount||0),0);
+
+      if(!total){
+        panel.innerHTML='<div class="fnSub">No debts recorded. Add one under Setup.</div>';
+        return;
+      }
+
+      // Reuse the fortnight model so this can never disagree with the card above.
+      // cardsPayTotal is what you actually pay the cards this fortnight.
+      // The motorbike loan is modelled separately from the cards: its
+      // paymentAmount is committed to the loan specifically, so it can't
+      // actually pay off sooner just because card debt happens to be lower.
+      // The loan finishes on its own contractual schedule (start + term),
+      // never earlier — the true "debt free" date is the later of that and
+      // whenever the cards clear at the current card repayment rate.
+      const f=getFortnight();
+      const cardDebts=debts.filter(d=>!/motorbike/i.test(d.name));
+      const cardDebtTotal=cardDebts.reduce((s,d)=>s+Number(d.amount||0),0);
+      const cardRepay=f.cardsPayTotal;
+      const cardFns=cardRepay>0?Math.ceil(cardDebtTotal/cardRepay):0;
+      const cardsClear=cardFns?(()=>{const d=new Date(today());d.setDate(d.getDate()+cardFns*14);return d;})():null;
+
+      const hasLoan=debts.some(d=>/motorbike/i.test(d.name)) && Number(data.loan.total)>0;
+      const loanClear=hasLoan?(()=>{const d=new Date(parseDate(data.loan.startDate||iso(today())));d.setMonth(d.getMonth()+(Number(data.loan.termMonths)||60));return d;})():null;
+
+      const repay=cardRepay + (Number(data.loan.paymentAmount)||0);
+      const clear=[cardsClear,loanClear].filter(Boolean).sort((a,b)=>b-a)[0] || null;
+      const fns=clear?Math.ceil((clear-today())/(14*86400000)):0;
+      const yrs=clear?Math.floor((clear-today())/(365*86400000)):0;
+      const mos=clear?Math.round((((clear-today())/86400000)%365)/30.44):0;
+      const span=clear?(yrs?yrs+'y '+mos+'m':mos+'m'):'--';
+
+      // Round percentages so they add up to 100%, rounding each one on its
+      // own (59.2 -> 59, 21.5 -> 21, 19.2 -> 19) can undershoot the total by
+      // a point or two. Largest-remainder method: floor everyone, then hand
+      // the leftover points to whoever's fraction got cut the most.
+      const rawPct=debts.map(d=>d.amount/total*100);
+      const floored=rawPct.map(Math.floor);
+      let remainder=100-floored.reduce((s,v)=>s+v,0);
+      const order=floored.map((v,i)=>i).sort((a,b)=>(rawPct[b]%1)-(rawPct[a]%1));
+      const pct=floored.slice();
+      for(let k=0;k<remainder;k++) pct[order[k]]++;
+
+      // How much of each debt is already paid off. The motorbike loan has a
+      // real original amount to compare against (data.loan.total). Cards
+      // don't, a limit isn't the same thing as what you originally owed, so
+      // for those "paid off" is measured against the credit limit instead,
+      // clearly labelled as such, or left untracked if there's no limit set.
+      const paidInfo=debts.map(d=>{
+        if(/motorbike/i.test(d.name) && Number(data.loan.total)>0){
+          const paid=Number(data.loan.paid)||0, orig=Number(data.loan.total);
+          return {paid, of:orig, label:'of original loan', pct:orig?paid/orig*100:0, tracked:true};
+        }
+        const account=data.accounts.find(a=>normalise(a.name)===normalise(d.name)||paymentMatches(d.name,a.name));
+        const limit=Number(account&&account.limit)||0;
+        if(limit>0){
+          const paid=Math.max(0,limit-Number(d.amount||0));
+          return {paid, of:limit, label:'of credit limit', pct:paid/limit*100, tracked:true};
+        }
+        return {tracked:false};
+      });
+
+      panel.innerHTML=`
+        <div class="loanTop">
+          <div>
+            <div class="label">Owing</div>
+            <div class="fnBig">${money(total)}</div>
+            <div class="fnSub">across ${debts.length} account${debts.length===1?'':'s'}</div>
+          </div>
+          <div class="loanPct">
+            <b class="${clear?'':'muted'}">${span}</b><span>${clear?'to clear':'no repayments set'}</span>
+          </div>
+        </div>
+
+        <div class="debtBar">${debts.map(d=>`<div class="debtSeg" style="width:${d.amount/total*100}%;background:${d.color||'var(--muted)'}" title="${escHtml(d.name)}"></div>`).join('')}</div>
+
+        <div class="debtLegend">
+          ${debts.map((d,i)=>{
+            const p=paidInfo[i];
+            const sub=p.tracked
+              ? `${money(p.paid)} paid ${p.label} of ${money(p.of)} &middot; ${p.pct.toFixed(0)}% paid off`
+              : 'Paid-off tracking not set for this account';
+            return `<div class="debtRow">
+              <span><i class="dot" style="background:${d.color||'var(--muted)'}"></i>${escHtml(d.name)} <b>${money(d.amount)}</b><em>${pct[i]}%</em></span>
+              <div class="fnSub debtRowSub">${sub}</div>
+            </div>`;
+          }).join('')}
+        </div>
+
+        <div class="subgrid" style="margin-top:14px">
+          <div><div class="label">Repayments</div><b>${money(repay)} <span class="fnDue">per fortnight</span></b></div>
+          <div><div class="label">Debt free (est.)</div><b>${clear?niceDate(clear):'Set repayments'}</b></div>
+        </div>
+        <div class="fnSub" style="margin-top:10px">Estimate assumes repayments stay the same and ignores future interest.</div>`;
+    })();
+
+    const loanRemain=Math.max((Number(data.loan.total)||0)-(Number(data.loan.paid)||0),0);
+    loanTotalInput.value=data.loan.total||0; loanPaidInput.value=data.loan.paid||0; loanRemainingInput.value=loanRemain.toFixed(2); loanStartDateInput.value=data.loan.startDate||''; loanPaymentAmountInput.value=data.loan.paymentAmount||0; loanTermMonthsInput.value=data.loan.termMonths||60;
+
+    if(document.getElementById('loanSummaryNotice')){
+      const loanBill=data.bills.find(b=>/motorbike/i.test(b.description));
+      const nextDebit=loanBill?niceDate(nextDate(loanBill)):'Not set';
+      loanSummaryNotice.innerHTML=`<b>Current setup:</b> total including interest ${money(data.loan.total||0)}, first payment ${data.loan.startDate?niceDate(parseDate(data.loan.startDate)):'not set'}, fortnightly payment ${money(data.loan.paymentAmount||0)}. <b>Next debit:</b> ${nextDebit}, then fortnightly every second week from that date.`;
+    }
+    
+    if(document.getElementById('profileDebtsTable')){
+      profileDebtsTable.innerHTML=data.debts.map((d,i)=>{
+        const bill=data.bills.find(b=>paymentMatches(b.description,d.name) || normalise(b.description)===normalise(d.name));
+        return `<tr>
+          <td><b>${escHtml(d.name)}</b><span class="fnMinMobile">${bill ? money(bill.amount)+' repayment' : 'no repayment set'}</span></td>
+          <td class="hideMobile">${escHtml(d.type || (d.name.toLowerCase().includes('card')?'Credit Card':'Loan'))}</td>
+          <td>${money(d.amount)}</td>
+          <td class="hideMobile">${bill ? money(bill.amount) : '$0.00'}</td>
+          <td>${bill ? `<span class="hideMobile">${niceDate(nextDate(bill))}</span><span class="onlyMobile">${shortDate(nextDate(bill))}</span>` : 'Not set'}</td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" onclick="editDebtItem(${i})">Edit</button><button class="btn secondary" onclick="deleteDebtItem(${i})">Delete</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    setCash.value=data.settings.cashAvailable||0; setIncome.value=data.settings.fortnightlyIncome||0; setSavings.value=(data.settings.fortnightlySavings ?? DEFAULT_SAVINGS); setPayday.value=data.settings.nextPayday||'';
+  } catch(e) {
+    console.error(e);
+    alert('There was a dashboard error: '+e.message);
+  }
+}
+
+// Fixed bills are automatic direct debits, so once a due date is in the
+// past it's treated as paid: the linked balance drops and the bill rolls
+// forward to its next cycle. Runs every render, no manual tick needed.
+function autoRollBills(){
+  let changed=false;
+  const t=today();
+  data.bills.forEach(b=>{
+    let d=parseDate(b.date);
+    let guard=0, rolled=false;
+    while(d<t && guard<300){
+      applyPaymentToBalances(b);
+      d=addCycle(d,b.repeat);
+      guard++; rolled=true;
+    }
+    if(rolled){ b.date=iso(d); changed=true; }
+  });
+  if(changed) saveStore();
+}
+let editingBillIndex=null;
+function openEntry(){
+  editingBillIndex=null;
+  document.getElementById('entryDialogTitle').textContent='Add Payment';
+  document.getElementById('entryDialogSave').textContent='Save payment';
+  newDesc.value=''; newAmount.value=''; newDate.value=''; newRepeat.value='Fortnightly';
+  entryDialog.showModal();
+}
+function editBill(i){
+  const b=data.bills[i];
+  if(!b) return;
+  editingBillIndex=i;
+  document.getElementById('entryDialogTitle').textContent='Edit Payment';
+  document.getElementById('entryDialogSave').textContent='Save changes';
+  newDesc.value=b.description;
+  newAmount.value=b.amount;
+  newDate.value=b.date;
+  newRepeat.value=b.repeat;
+  entryDialog.showModal();
+}
+function saveBillEntry(){
+  const entry={description:newDesc.value||'New payment',amount:+newAmount.value||0,date:newDate.value||iso(today()),repeat:newRepeat.value};
+  if(editingBillIndex!=null && data.bills[editingBillIndex]){
+    data.bills[editingBillIndex]=entry;
+  } else {
+    data.bills.push(entry);
+  }
+  editingBillIndex=null;
+  newDesc.value=''; newAmount.value=''; newDate.value='';
+  save();
+  entryDialog.close();
+}
+function deleteBill(i){ data.bills.splice(i,1); save(); }
+function saveLoanSettings(){ data.loan.total=+loanTotalInput.value||0; data.loan.paid=Math.min(data.loan.total,+loanPaidInput.value||0); data.loan.startDate=loanStartDateInput.value; data.loan.paymentAmount=+loanPaymentAmountInput.value||0; data.loan.termMonths=+loanTermMonthsInput.value||60; syncFigures(); save(); }
+function saveProfileSettings(){
+  data.settings.cashAvailable=+setCash.value||0;
+  data.settings.fortnightlyIncome=+setIncome.value||0;
+  data.settings.fortnightlySavings=+setSavings.value||0;
+  const plans={};
+  document.querySelectorAll('#fnCardPlanInputs input[data-card]').forEach(i=>{
+    const v=+i.value; if(v>0) plans[i.dataset.card]=v;
+  });
+  data.settings.cardPlans=plans;
+
+  const tracked={};
+  document.querySelectorAll('#fnCardPlanInputs input[data-mintrack]').forEach(i=>{
+    tracked[i.dataset.mintrack]=i.checked;
+  });
+  data.settings.cardMinTracked=tracked;
+
+  data.settings.planSet=true;
+  syncAutoPayday(); save();
+}
+function blankProfile(name,cash,income,emTarget,emCurrent,payday){ return {updated:new Date().toLocaleDateString(),accounts:[{name:'Credit Card 1',balance:0,min:0,due:'Set date',limit:0,available:0,logo:'💳'},{name:'Credit Card 2',balance:0,min:0,due:'Set date',limit:0,available:0,logo:'🔷'}],settings:{cashAvailable:cash,fortnightlyIncome:income,emergencyTarget:emTarget,emergencyCurrent:emCurrent,nextPayday:payday},debts:[],bills:[],loan:{total:0,paid:0,startDate:'',paymentAmount:0,termMonths:60} }; }
+
+let editingDebtIndex=null;
+
+function fillDebtForm(v){
+  newDebtType.value=v.type||'Credit Card';
+  newDebtName.value=v.name||'';
+  newDebtBalance.value=v.balance||0;
+  newDebtLimit.value=v.limit||'';
+  newDebtRepayment.value=v.repayment||'';
+  newDebtDate.value=v.date||'';
+  newDebtRepeat.value=v.repeat||'Fortnightly';
+  newDebtColor.value=v.color||'#2f77d0';
+}
+
+function editDebtItem(i){
+  const d=data.debts[i];
+  if(!d) return;
+  editingDebtIndex=i;
+  const bill=data.bills.find(b=>paymentMatches(b.description,d.name) || normalise(b.description)===normalise(d.name));
+  const account=data.accounts.find(a=>normalise(a.name)===normalise(d.name));
+  fillDebtForm({
+    type: d.type || (account ? 'Credit Card' : 'Other Loan'),
+    name: d.name,
+    balance: d.amount,
+    limit: account ? account.limit : '',
+    repayment: bill ? bill.amount : '',
+    date: bill ? bill.date : '',
+    repeat: bill ? bill.repeat : 'Fortnightly',
+    color: d.color
+  });
+  document.getElementById('addDebtTitle').textContent='EDIT '+d.name.toUpperCase();
+  document.getElementById('addDebtSave').textContent='Save changes';
+  document.getElementById('addDebtCancel').hidden=false;
+  document.getElementById('addDebtDetails').open=true;
+  newDebtName.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function cancelEditDebt(){
+  editingDebtIndex=null;
+  newDebtName.value=''; newDebtBalance.value=''; newDebtLimit.value=''; newDebtRepayment.value=''; newDebtDate.value='';
+  document.getElementById('addDebtTitle').textContent='ADD A CARD, LOAN OR DEBT';
+  document.getElementById('addDebtSave').textContent='Add to profile';
+  document.getElementById('addDebtCancel').hidden=true;
+}
+
+function saveDebtItem(){
+  const type=newDebtType.value;
+  const name=(newDebtName.value||type).trim();
+  const balance=+newDebtBalance.value||0;
+  const limit=+newDebtLimit.value||0;
+  const repayment=+newDebtRepayment.value||0;
+  const date=newDebtDate.value||iso(today());
+  const repeat=newDebtRepeat.value;
+  const color=newDebtColor.value||'#2f77d0';
+  const icon=newDebtIcon.value||'💰';
+
+  if(editingDebtIndex!=null && data.debts[editingDebtIndex]){
+    const oldName=data.debts[editingDebtIndex].name;
+    data.debts[editingDebtIndex]={name,amount:balance,color,type};
+
+    let account=data.accounts.find(a=>normalise(a.name)===normalise(oldName));
+    if(type==='Credit Card'){
+      if(account){
+        account.name=name; account.balance=balance; account.min=repayment;
+        account.due=niceDate(parseDate(date)); account.limit=limit||balance;
+        account.available=Math.max(0,(limit||balance)-balance);
+      } else {
+        data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),logo:icon});
+      }
+    } else if(account){
+      data.accounts=data.accounts.filter(a=>a!==account);
+    }
+
+    const bill=data.bills.find(b=>paymentMatches(b.description,oldName) || normalise(b.description)===normalise(oldName));
+    if(bill){ bill.description=name; bill.date=date; bill.amount=repayment; bill.repeat=repeat; }
+    else { data.bills.push({description:name,date,amount:repayment,repeat}); }
+
+    if(!data.loans) data.loans=[];
+    const loan=data.loans.find(l=>normalise(l.name)===normalise(oldName));
+    const isLoanType=type!=='Credit Card' && (type.includes('Loan') || type==='Mortgage' || type==='Car Loan');
+    if(loan){
+      if(isLoanType){ loan.name=name; loan.type=type; loan.original=limit||balance; loan.balance=balance; loan.repayment=repayment; loan.date=date; loan.repeat=repeat; loan.color=color; }
+      else { data.loans=data.loans.filter(l=>l!==loan); }
+    } else if(isLoanType){
+      data.loans.push({name,type,original:limit||balance,balance,repayment,date,repeat,color});
+    }
+
+    cancelEditDebt();
+    save();
+    return;
+  }
+
+  data.debts.push({name,amount:balance,color,type});
+
+  if(type==='Credit Card'){
+    data.accounts.push({
+      name,
+      balance,
+      min:repayment,
+      due:niceDate(parseDate(date)),
+      limit:limit || balance,
+      available:Math.max(0,(limit||balance)-balance),
+      logo:icon
+    });
+  }
+
+  data.bills.push({
+    description:name,
+    date,
+    amount:repayment,
+    repeat
+  });
+
+  if(type!=='Credit Card' && (type.includes('Loan') || type==='Mortgage' || type==='Car Loan')){
+    if(!data.loans) data.loans=[];
+    data.loans.push({
+      name,
+      type,
+      original:limit || balance,
+      balance,
+      repayment,
+      date,
+      repeat,
+      color
+    });
+  }
+
+  newDebtName.value='';
+  newDebtBalance.value='';
+  newDebtLimit.value='';
+  newDebtRepayment.value='';
+  newDebtDate.value='';
+  save();
+}
+
+function deleteDebtItem(index){
+  const debt=data.debts[index];
+  if(!debt) return;
+  if(!confirm('Delete '+debt.name+' from this profile?')) return;
+  if(editingDebtIndex===index) cancelEditDebt();
+  data.debts.splice(index,1);
+  data.accounts=data.accounts.filter(a=>normalise(a.name)!==normalise(debt.name));
+  data.bills=data.bills.filter(b=>normalise(b.description)!==normalise(debt.name));
+  if(data.loans) data.loans=data.loans.filter(l=>normalise(l.name)!==normalise(debt.name));
+  save();
+}
+
+function escHtml(v){ return String(v).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escAttr(v){ return escHtml(v); }
+
+
+function resetCurrentProfile(){
+  const name=store.active;
+  if(!confirm('Clear all payments, debts and balances in "'+name+'"? This cannot be undone.')) return;
+  const s=data.settings||{};
+  data=blankProfile(name,0,Number(s.fortnightlyIncome)||0,Number(s.emergencyTarget)||0,0,iso(autoNextPayday(today())));
+  data.accounts=[];
+  store.profiles[name]=data;
+  saveStore(); render();
+}
+function downloadBackup(){ const blob=new Blob([JSON.stringify(store,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='finance-tracker-all-profiles-backup.json'; a.click(); }
+
+applyTheme();
+// In cloud mode nothing renders until the Firestore snapshot arrives after
+// sign in, so no financial data ever reaches the DOM while signed out.
+if(!CLOUD) render();
+
+/* ===================== CLOUD SYNC ===================== */
+let cloudReady=false, cloudUser=null, cloudDocUnsub=null, cloudPushTimer=null, applyingRemote=false;
+let autoSyncedThisLoad=false;
+
+// Fires once per page load/refresh, right after we know who's signed in.
+// Guarded so a stray extra auth-state event never double-syncs.
+function autoSyncBank(){
+  if(autoSyncedThisLoad || !window._fns) return;
+  autoSyncedThisLoad=true;
+  window._fns.httpsCallable('syncBankNow')().catch(e=>console.error('auto bank sync failed', e));
+  window._fns.httpsCallable('syncLatitudeNow')().catch(e=>console.error('auto latitude sync failed', e));
+}
+
+function cloudConfigured(){
+  return typeof firebase!=='undefined'
+    && typeof firebaseConfig!=='undefined'
+    && firebaseConfig.apiKey
+    && !/PASTE/.test(firebaseConfig.apiKey);
+}
+
+// Only these addresses may use the tracker. This is a convenience gate: it stops
+// the wrong account getting a usable UI. It is NOT the security boundary. The
+// real enforcement lives in the Firestore rules, which reject reads and writes
+// from any other account regardless of what this file says.
+const ALLOWED_EMAILS = ['gagotelli@gmail.com'];
+
+function emailAllowed(user){
+  if(!user || !user.email) return false;
+  return ALLOWED_EMAILS.includes(user.email.toLowerCase());
+}
+
+function setAuthError(m){ const e=document.getElementById('authError'); if(e) e.textContent=m||''; }
+function showAuthOverlay(show){
+  const o=document.getElementById('authOverlay');
+  if(o) o.style.display=show?'flex':'none';
+  document.body.classList.toggle('authLocked', !!show);
+}
+let acctUser=null;
+
+function paintAvatar(el, user, name){
+  if(!el) return;
+  if(user.photoURL){
+    // Built as DOM nodes, not innerHTML string concatenation, so a photoURL
+    // that happens to contain a quote or angle bracket can't break out of
+    // the attribute and inject markup.
+    el.textContent='';
+    const img=document.createElement('img');
+    img.alt='';
+    img.referrerPolicy='no-referrer'; // stops googleusercontent returning 403 on the avatar
+    img.onerror=()=>{ el.textContent=name.charAt(0)||'?'; };
+    img.src=user.photoURL;
+    el.appendChild(img);
+  } else {
+    el.textContent=name.charAt(0)||'?';
+  }
+}
+
+function providerLabel(user){
+  const ids=(user.providerData||[]).map(p=>p.providerId);
+  if(ids.includes('google.com')) return 'Google';
+  if(ids.includes('password')) return 'Email and password';
+  return 'Unknown';
+}
+
+function toggleSignOut(show, user){
+  const box=document.getElementById('accountBox');
+  if(!box) return;
+  box.style.display=show?'block':'none';
+  if(!show || !user){ acctUser=null; closeAcctDrop(); return; }
+  acctUser=user;
+
+  const name=user.displayName || (user.email||'').split('@')[0] || 'Signed in';
+  const mail=user.email || '';
+  const prov=providerLabel(user);
+
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=v; };
+  set('acctName',name); set('acctMail',mail); set('acctProv','Signed in with '+prov);
+
+  paintAvatar(document.getElementById('acctBtn'), user, name);
+  paintAvatar(document.getElementById('acctAvatarLg'), user, name);
+
+  const btn=document.getElementById('acctBtn');
+  if(btn) btn.title='Signed in as '+(mail||name);
+
+  // password reset only makes sense for password accounts
+  const pwd=document.getElementById('acctPwd');
+  if(pwd) pwd.style.display=(prov==='Google')?'none':'block';
+}
+
+function closeAcctDrop(){
+  const d=document.getElementById('acctDrop');
+  const b=document.getElementById('acctBtn');
+  if(d) d.classList.remove('open');
+  if(b) b.setAttribute('aria-expanded','false');
+}
+
+function setAcctMsg(m, isErr){
+  const e=document.getElementById('acctMsg');
+  if(!e) return;
+  e.textContent=m||'';
+  e.classList.toggle('err', !!isErr);
+}
+
+function pushToCloud(force){
+  if(!cloudConfigured() || !cloudUser || applyingRemote) return;
+  if(!cloudReady && !force) return;
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer=setTimeout(()=>{
+    try{
+      // merge:true is load bearing. A plain set() replaces the whole document
+      // and would wipe the `bank` field written by the syncBank function.
+      window._db.collection('trackers').doc(cloudUser.uid)
+        .set({ store: JSON.parse(JSON.stringify(store)), updatedAt: Date.now() }, { merge: true });
+    }catch(e){ console.error('cloud push failed', e); }
+  }, 400);
+}
+
+function initCloud(){
+  if(!cloudConfigured()){
+    // stay local-only until config is pasted, but say so loudly
+    console.warn('Cloud sync disabled: firebaseConfig still contains PASTE_ placeholders.');
+    const w=document.getElementById('cloudWarn'); if(w) w.style.display='block';
+    document.body.classList.remove('authLocked'); // never strand the user behind a blur
+    return;
+  }
+  firebase.initializeApp(firebaseConfig);
+  const auth=firebase.auth();
+  const db=firebase.firestore();
+  window._auth=auth; window._db=db;
+  try{ window._fns=firebase.app().functions('australia-southeast1'); }
+  catch(e){ console.warn('functions sdk unavailable', e); }
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
+
+  // catch the result of a mobile redirect sign in
+  auth.getRedirectResult().catch(e=>{ if(e && e.code!=='auth/no-auth-event') setAuthError(e.message); });
+
+  auth.onAuthStateChanged(user=>{
+    cloudUser=user;
+    if(cloudDocUnsub){ cloudDocUnsub(); cloudDocUnsub=null; }
+    if(!user){
+      cloudReady=false;
+      toggleSignOut(false);
+      showAuthOverlay(true);
+      return;
+    }
+
+    // wrong account: sign it straight back out, never attach a listener
+    if(!emailAllowed(user)){
+      const who=user.email||'that account';
+      cloudReady=false;
+      toggleSignOut(false);
+      showAuthOverlay(true);
+      auth.signOut().finally(()=>setAuthError(who+' is not authorised to use this tracker.'));
+      return;
+    }
+
+    showAuthOverlay(false);
+    toggleSignOut(true, user);
+    autoSyncBank();
+    const ref=db.collection('trackers').doc(user.uid);
+    cloudDocUnsub=ref.onSnapshot(snap=>{
+      if(snap.metadata.hasPendingWrites) return; // ignore our own local write echo
+      // the feed lives alongside `store`, written only by the Cloud Function
+      bank = (snap.exists && snap.data() && snap.data().bank) || null;
+      latitude = (snap.exists && snap.data() && snap.data().latitude) || null;
+      if(snap.exists && snap.data() && snap.data().store){
+        applyingRemote=true;
+        let fixedData=false;
+        try{
+          store=snap.data().store;
+          if(!store.profiles || !Object.keys(store.profiles).length){
+            store={active:'Gerardo',profiles:{Gerardo:structuredClone(seed)}};
+          }
+          if(!store.profiles[store.active]) store.active=Object.keys(store.profiles)[0];
+          data=store.profiles[store.active];
+          fixedData=applyDataFixes(store);
+          data=store.profiles[store.active];
+          if(!CLOUD) localStorage.setItem(STORE_KEY,JSON.stringify(store));
+          render();
+        } finally { applyingRemote=false; }
+        cloudReady=true;
+        // Persisted only after applyingRemote resets, otherwise pushToCloud's
+        // own remote-echo guard would silently swallow this write.
+        if(fixedData) saveStore();
+      } else {
+        cloudReady=true;   // first login on this account: seed cloud from local
+        pushToCloud(true);
+      }
+    }, err=>console.error('cloud sync error', err));
+  });
+}
+
+// popups are unreliable in mobile Safari, standalone PWAs and in-app browsers
+function preferRedirect(){
+  const ua=navigator.userAgent||'';
+  const iOS=/iPad|iPhone|iPod/.test(ua);
+  const inApp=/FBAN|FBAV|Instagram|Line|Twitter|WebView/i.test(ua);
+  const standalone=window.navigator.standalone===true
+    || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  return iOS || inApp || standalone;
+}
+
+function googleSignIn(){
+  setAuthError('');
+  if(!window._auth){ setAuthError('Cloud sync is not configured yet.'); return; }
+  const provider=new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt:'select_account' });
+  if(preferRedirect()){ window._auth.signInWithRedirect(provider).catch(e=>setAuthError(e.message)); return; }
+  window._auth.signInWithPopup(provider).catch(e=>{
+    const fallback=['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/cancelled-popup-request'];
+    if(fallback.includes(e.code)){
+      window._auth.signInWithRedirect(provider).catch(err=>setAuthError(err.message));
+      return;
+    }
+    if(e.code==='auth/popup-closed-by-user') return; // user just backed out
+    if(e.code==='auth/account-exists-with-different-credential'){
+      setAuthError('That email already has a password account. Sign in with your password first.');
+      return;
+    }
+    setAuthError(e.message);
+  });
+}
+
+function wireAuthButtons(){
+  const email=()=>document.getElementById('authEmail').value.trim();
+  const pass=()=>document.getElementById('authPass').value;
+  const si=document.getElementById('authSignIn');
+  const su=document.getElementById('authSignUp');
+  const rs=document.getElementById('authReset');
+  const so=document.getElementById('signOutBtn');
+  const gg=document.getElementById('authGoogle');
+  if(gg) gg.onclick=googleSignIn;
+
+  // avatar menu open and close
+  const ab=document.getElementById('acctBtn');
+  const ad=document.getElementById('acctDrop');
+  if(ab && ad){
+    ab.onclick=e=>{
+      e.stopPropagation();
+      const open=ad.classList.toggle('open');
+      ab.setAttribute('aria-expanded', open?'true':'false');
+    };
+    ad.onclick=e=>e.stopPropagation();
+    document.addEventListener('click', closeAcctDrop);
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAcctDrop(); });
+  }
+
+  // account settings dialog
+  const as=document.getElementById('acctSettings');
+  if(as) as.onclick=()=>{
+    closeAcctDrop();
+    if(!acctUser) return;
+    const v=(id,val)=>{ const e=document.getElementById(id); if(e) e.value=val; };
+    v('acctNameInput', acctUser.displayName||'');
+    v('acctMailInput', acctUser.email||'');
+    v('acctProvInput', providerLabel(acctUser));
+    v('acctUidInput', acctUser.uid);
+    setAcctMsg('');
+    document.getElementById('acctDialog').showModal();
+  };
+
+  const save=document.getElementById('acctSave');
+  if(save) save.onclick=()=>{
+    if(!acctUser) return;
+    const nn=document.getElementById('acctNameInput').value.trim();
+    acctUser.updateProfile({displayName:nn})
+      .then(()=>{ toggleSignOut(true, window._auth.currentUser); setAcctMsg('Saved.'); })
+      .catch(e=>setAcctMsg(e.message,true));
+  };
+
+  const pwd=document.getElementById('acctPwd');
+  if(pwd) pwd.onclick=()=>{
+    closeAcctDrop();
+    if(!acctUser || !acctUser.email) return;
+    window._auth.sendPasswordResetEmail(acctUser.email)
+      .then(()=>alert('Password reset email sent to '+acctUser.email))
+      .catch(e=>alert(e.message));
+  };
+
+  if(si) si.onclick=()=>{ setAuthError(''); window._auth.signInWithEmailAndPassword(email(),pass()).catch(e=>setAuthError(e.message)); };
+  if(su) su.onclick=()=>{ setAuthError(''); window._auth.createUserWithEmailAndPassword(email(),pass()).catch(e=>setAuthError(e.message)); };
+  if(rs) rs.onclick=()=>{ if(!email()){ setAuthError('Enter your email first.'); return; } window._auth.sendPasswordResetEmail(email()).then(()=>setAuthError('Reset email sent.')).catch(e=>setAuthError(e.message)); };
+  if(so) so.onclick=()=>{
+    if(!window._auth) return;
+    // reload so no rendered figures linger in the DOM after sign out
+    window._auth.signOut().finally(()=>{ if(CLOUD) location.reload(); });
+  };
+}
+
+function wireFeedSyncButton(btnId, msgId, fnName){
+  const btn=document.getElementById(btnId);
+  const msg=document.getElementById(msgId);
+  if(!btn) return;
+  btn.addEventListener('click', async ()=>{
+    if(!CLOUD || !window._fns || !cloudUser){
+      if(msg){ msg.style.display='block'; msg.textContent='Sign in first. The feed is read from the cloud.'; }
+      return;
+    }
+    const label=btn.textContent;
+    btn.disabled=true; btn.textContent='Syncing';
+    try{
+      // No local repaint needed. The function writes to trackers/{uid} and the
+      // existing onSnapshot listener fires, which calls render().
+      await window._fns.httpsCallable(fnName)();
+    }catch(e){
+      console.error(fnName+' failed', e);
+      if(msg){ msg.style.display='block'; msg.textContent='Sync failed: '+(e.message||e.code||'unknown error'); }
+    }finally{
+      btn.disabled=false; btn.textContent=label;
+    }
+  });
+}
+
+function wireBankSync(){
+  wireFeedSyncButton('bkSyncBtn','bkMsg','syncBankNow');
+  wireFeedSyncButton('ltSyncBtn','ltMsg','syncLatitudeNow');
+}
+
+wireAuthButtons();
+wireBankSync();
+initCloud();
+
+</script>
+</body>
+</html>
