@@ -1993,9 +1993,21 @@ function renderSpendChart(){
     return;
   }
   const rows=weekKeys.map(wk=>({wk, bank:buckets[wk].bank, lat:buckets[wk].lat, total:buckets[wk].bank+buckets[wk].lat}));
-  const max=Math.max(...rows.map(r=>r.total), 1);
+  const rawMax=Math.max(...rows.map(r=>r.total), 1);
 
-  const W=760, H=240, padL=54, padR=10, padT=16, padB=26;
+  // Round tick step to a "nice" 1/2/5 x 10^n number (same approach any
+  // charting library uses) instead of 3 arbitrary fractions of the max, so
+  // the axis reads like $0 / $1,000 / $2,000... rather than 3 odd amounts.
+  const tickCount=5;
+  const rawStep=rawMax/tickCount;
+  const mag=Math.pow(10,Math.floor(Math.log10(rawStep||1)));
+  const norm=rawStep/mag;
+  const step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag;
+  const ticks=[];
+  for(let v=0; v<=rawMax+step*0.001; v+=step) ticks.push(Math.round(v*100)/100);
+  const max=ticks[ticks.length-1];
+
+  const W=760, H=240, padL=64, padR=10, padT=16, padB=26;
   const plotW=W-padL-padR, plotH=H-padT-padB;
   const n=rows.length;
   const xAt=i=> n<=1 ? padL+plotW/2 : padL+(plotW*i/(n-1));
@@ -2012,7 +2024,6 @@ function renderSpendChart(){
   const bankVals=rows.map(r=>r.bank);
   const totalVals=rows.map(r=>r.total);
 
-  const ticks=[0,0.5,1].map(f=>max*f);
   const gridLines=ticks.map(t=>`<line x1="${padL}" y1="${yAt(t).toFixed(1)}" x2="${W-padR}" y2="${yAt(t).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`).join('');
   const yLabels=ticks.map(t=>`<text x="${padL-8}" y="${(yAt(t)+4).toFixed(1)}" text-anchor="end" class="chartAxis">${money(t)}</text>`).join('');
   const xLabels=rows.map((r,i)=>{
