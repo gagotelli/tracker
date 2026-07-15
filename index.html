@@ -193,15 +193,10 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
   .debtLegend em{min-width:34px;text-align:right}
 }
 
-.weekChart{display:flex;align-items:flex-end;gap:10px;height:170px;padding-top:8px}
-.weekBar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
-.weekBar .bar{width:100%;max-width:40px;background:var(--blue);border-radius:6px 6px 0 0}
-.weekBar .amt{font-family:var(--mono);font-size:11px;font-weight:700;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.weekBar .lbl{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:8px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
-@media(max-width:520px){
-  .weekChart{height:140px;gap:6px}
-  .weekBar .amt{font-size:10px}
-}
+.spendSvg{width:100%;height:auto;display:block;overflow:visible}
+.chartAxis{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.chartLegend{display:flex;gap:18px;margin-top:10px;font-size:12px;color:var(--muted)}
+.chartLegend .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
 
 /* ===== THIS FORTNIGHT: mobile fit =====
    These tables are narrow by design and must never trigger the card's
@@ -1951,10 +1946,12 @@ function loadSpendHistory(){
     });
 }
 
-// Weekly spending bars, Monday-start buckets, spending only (positive
-// amounts are income and are excluded). Purely a client-side aggregation of
-// whatever loadSpendHistory() already fetched, so this is cheap to call
-// from every render() pass.
+// Weekly spending, stacked by account (CommBank vs Latitude), Monday-start
+// buckets, spending only (positive amounts are income and are excluded).
+// Purely a client-side aggregation + SVG render of whatever
+// loadSpendHistory() already fetched, so this is cheap to call from every
+// render() pass. No charting library: this app loads nothing but the
+// Firebase SDK, so the area chart is hand-built as plain SVG paths.
 function renderSpendChart(){
   const box=document.getElementById('spendChart');
   if(!box) return;
@@ -1970,43 +1967,76 @@ function renderSpendChart(){
     box.innerHTML='<div class="fnSub">No transaction history yet. Press Sync now on CommBank or Latitude to pull some.</div>';
     return;
   }
+
   // trackers/{uid}/transactions holds every PocketSmith-connected account,
   // including ones deliberately left out of the CommBank/Latitude split
   // (like a third "Spending (Up)" account) and any transfers between your
   // own accounts, which aren't real spending. Only count transactions from
-  // accounts actually classified as CommBank or Latitude, the same set the
-  // rest of the dashboard uses, so this can't quietly include money moved
-  // between your own accounts or a connection the app doesn't track.
-  const knownIds=new Set([
-    ...((bank && Array.isArray(bank.accounts)) ? bank.accounts.map(a=>a.id) : []),
-    ...((latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.map(a=>a.id) : [])
-  ]);
+  // accounts actually classified as CommBank or Latitude, the same split
+  // the rest of the dashboard uses.
+  const bankIds=new Set((bank && Array.isArray(bank.accounts)) ? bank.accounts.map(a=>a.id) : []);
+  const latIds=new Set((latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.map(a=>a.id) : []);
   const weekStart=d=>{ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return iso(x); };
   const buckets={};
   spendHistory.forEach(t=>{
     const amt=Number(t.amount)||0;
     if(amt>=0 || !t.date) return;
-    if(t.accountId!=null && knownIds.size && !knownIds.has(t.accountId)) return;
+    const isBank=bankIds.has(t.accountId), isLat=latIds.has(t.accountId);
+    if(!isBank && !isLat) return;
     const wk=weekStart(parseDate(t.date));
-    buckets[wk]=(buckets[wk]||0)+Math.abs(amt);
+    if(!buckets[wk]) buckets[wk]={bank:0,lat:0};
+    buckets[wk][isBank?'bank':'lat']+=Math.abs(amt);
   });
-  const weeks=Object.keys(buckets).sort();
-  if(!weeks.length){
+  const weekKeys=Object.keys(buckets).sort();
+  if(!weekKeys.length){
     box.innerHTML='<div class="fnSub">No spending in the synced history yet.</div>';
     return;
   }
-  const max=Math.max(...weeks.map(w=>buckets[w]));
-  const bars=weeks.map(w=>{
-    const v=buckets[w];
-    const h=max>0?Math.max(4,Math.round(v/max*100)):4;
-    return `<div class="weekBar">
-      <span class="amt">${money(v)}</span>
-      <div class="bar" style="height:${h}%"></div>
-      <span class="lbl">${shortDate(parseDate(w))}</span>
-    </div>`;
+  const rows=weekKeys.map(wk=>({wk, bank:buckets[wk].bank, lat:buckets[wk].lat, total:buckets[wk].bank+buckets[wk].lat}));
+  const max=Math.max(...rows.map(r=>r.total), 1);
+
+  const W=760, H=240, padL=54, padR=10, padT=16, padB=26;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const n=rows.length;
+  const xAt=i=> n<=1 ? padL+plotW/2 : padL+(plotW*i/(n-1));
+  const yAt=v=> padT+plotH-(Math.max(0,v)/max*plotH);
+
+  const areaPath=(topVals,botVals)=>{
+    const top=topVals.map((v,i)=>`${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`);
+    const bot=botVals.slice().reverse().map((v,i)=>`${xAt(botVals.length-1-i).toFixed(1)},${yAt(v).toFixed(1)}`);
+    return `M ${top.join(' L ')} L ${bot.join(' L ')} Z`;
+  };
+  const linePath=vals=> `M ${vals.map((v,i)=>`${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(' L ')}`;
+
+  const zero=rows.map(()=>0);
+  const bankVals=rows.map(r=>r.bank);
+  const totalVals=rows.map(r=>r.total);
+
+  const ticks=[0,0.5,1].map(f=>max*f);
+  const gridLines=ticks.map(t=>`<line x1="${padL}" y1="${yAt(t).toFixed(1)}" x2="${W-padR}" y2="${yAt(t).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`).join('');
+  const yLabels=ticks.map(t=>`<text x="${padL-8}" y="${(yAt(t)+4).toFixed(1)}" text-anchor="end" class="chartAxis">${money(t)}</text>`).join('');
+  const xLabels=rows.map((r,i)=>{
+    if(n>8 && i%2===1) return '';
+    return `<text x="${xAt(i).toFixed(1)}" y="${H-6}" text-anchor="middle" class="chartAxis">${shortDate(parseDate(r.wk))}</text>`;
   }).join('');
-  box.innerHTML=`<div class="weekChart">${bars}</div>
-    <div class="fnSub" style="margin-top:10px">${weeks.length} week${weeks.length===1?'':'s'} of spending across every synced account, from the last 35 days pulled from PocketSmith.</div>`;
+  const dots=rows.map((r,i)=>
+    `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(r.total).toFixed(1)}" r="3" fill="#8e35b8"><title>${shortDate(parseDate(r.wk))}: ${money(r.total)} total (${money(r.bank)} CommBank, ${money(r.lat)} Latitude)</title></circle>`
+  ).join('');
+
+  box.innerHTML=`
+    <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
+      ${gridLines}
+      <path d="${areaPath(bankVals,zero)}" fill="#2f77d0" fill-opacity=".28" stroke="#2f77d0" stroke-width="2"/>
+      <path d="${areaPath(totalVals,bankVals)}" fill="#8e35b8" fill-opacity=".28" stroke="#8e35b8" stroke-width="2"/>
+      ${dots}
+      ${yLabels}
+      ${xLabels}
+    </svg>
+    <div class="chartLegend">
+      <span><i class="dot" style="background:#2f77d0"></i>CommBank</span>
+      <span><i class="dot" style="background:#8e35b8"></i>Latitude</span>
+    </div>
+    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>`;
 }
 
 function cloudConfigured(){
