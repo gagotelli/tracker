@@ -612,7 +612,7 @@ const firebaseConfig = {
 
     <div class="grid" style="margin-bottom:16px">
       <div class="card span12">
-        <h2 class="section-title">MOTORBIKE LOAN</h2>
+        <h2 class="section-title">LOANS</h2>
         <div id="loanPanel"></div>
       </div>
     </div>
@@ -637,6 +637,11 @@ const firebaseConfig = {
           <tbody id="upcomingTable"></tbody>
         </table>
         <div class="notice">These are fixed direct debits. Once a due date passes, it rolls forward to the next cycle and updates the matching balance and safe-to-spend automatically, no need to tick anything.</div>
+
+        <div class="fnSubhead">Card debt attack</div>
+        <p class="fnHelp">Set how much you actually want to pay on each card this fortnight. This is separate from the card's real due amount above, it's an extra goal shown on the dashboard, not deducted from Safe to spend, so it's fine to be ambitious.</p>
+        <div id="fnCardPlanInputs" class="profileBox" style="margin-top:12px"></div>
+        <div class="actions"><button class="btn secondary" onclick="saveProfileSettings()">Save debt attack</button></div>
       </div>
     </div>
 
@@ -649,51 +654,22 @@ const firebaseConfig = {
         <label>Set aside as savings<input id="setSavings" type="number" step="0.01"><span class="fnHint">Reminder only, not deducted from Safe to spend</span></label>
         <label>Next payday<input id="setPayday" type="date" readonly title="Calculated from your fortnightly cycle"><span class="fnHint">Calculated automatically</span></label>
       </div>
-
-      <div class="fnSubhead">Card debt attack</div>
-      <p class="fnHelp">Set how much you actually want to pay on each card this fortnight. This is separate from the card's real due amount on the Payments tab, it's an extra goal shown on the dashboard, not deducted from Safe to spend, so it's fine to be ambitious.</p>
-      <div id="fnCardPlanInputs" class="profileBox" style="margin-top:12px"></div>
-
       <div class="actions"><button class="btn" onclick="saveProfileSettings()">Save plan</button></div>
     </div>
+
     <div class="card" style="margin-top:16px">
-      <h2 class="section-title">MOTORBIKE LOAN</h2>
-      <div class="notice" id="loanSummaryNotice"></div>
-      <details class="fnSettings">
-        <summary>Edit loan details</summary>
-        <div class="profileBox" style="margin-top:14px">
-          <label>Original Loan Amount incl. interest<input id="loanTotalInput" type="number" step="0.01"></label>
-          <label>Amount Already Paid<input id="loanPaidInput" type="number" step="0.01"></label>
-          <label>Remaining Balance<input id="loanRemainingInput" type="number" disabled></label>
-          <label>First Payment Date<input id="loanStartDateInput" type="date"></label>
-          <label>Fortnightly Payment<input id="loanPaymentAmountInput" type="number" step="0.01"></label>
-          <label>Term Months<input id="loanTermMonthsInput" type="number"></label>
-        </div>
-        <div class="actions"><button class="btn" onclick="saveLoanSettings()">Save Motorbike Loan</button></div>
-      </details>
-    </div>
-    <div class="card" style="margin-top:16px">
-      <details class="fnSettings" id="addDebtDetails">
-        <summary>Add a card, loan or debt</summary>
-        <h2 class="section-title" id="addDebtTitle" style="margin-top:14px">ADD A CARD, LOAN OR DEBT</h2>
-        <p class="notice">Use this for mortgage, car loan, personal loan, credit card, or any recurring repayment. It will update the dashboard, debt breakdown, upcoming payments, and put-aside calculator.</p>
+      <h2 class="section-title">CARDS</h2>
+      <details class="fnSettings" id="addCardDetails">
+        <summary>Add a card</summary>
+        <h2 class="section-title" id="addCardTitle" style="margin-top:14px">ADD A CARD</h2>
         <div class="profileBox">
-          <label>Type
-            <select id="newDebtType">
-              <option>Credit Card</option>
-              <option>Mortgage</option>
-              <option>Car Loan</option>
-              <option>Personal Loan</option>
-              <option>Other Loan</option>
-            </select>
-          </label>
-          <label>Name<input id="newDebtName" placeholder="Example: Home Mortgage"></label>
-          <label>Current Balance<input id="newDebtBalance" type="number" step="0.01"></label>
-          <label>Limit / Original Loan<input id="newDebtLimit" type="number" step="0.01"></label>
-          <label>Repayment Amount<input id="newDebtRepayment" type="number" step="0.01"></label>
-          <label>Next Repayment Date<input id="newDebtDate" type="date"></label>
+          <label>Name<input id="newCardName" placeholder="Example: CommBank Mastercard"></label>
+          <label>Current Balance<input id="newCardBalance" type="number" step="0.01"></label>
+          <label>Limit<input id="newCardLimit" type="number" step="0.01"></label>
+          <label>Repayment Amount<input id="newCardRepayment" type="number" step="0.01"></label>
+          <label>Next Repayment Date<input id="newCardDate" type="date"></label>
           <label>Repayment Cycle
-            <select id="newDebtRepeat">
+            <select id="newCardRepeat">
               <option>Fortnightly</option>
               <option>Monthly</option>
               <option>Weekly</option>
@@ -701,7 +677,7 @@ const firebaseConfig = {
             </select>
           </label>
           <label>Colour
-            <select id="newDebtColor">
+            <select id="newCardColor">
               <option value="#2f77d0">Blue</option>
               <option value="#8e35b8">Purple</option>
               <option value="#87c64a">Green</option>
@@ -711,30 +687,74 @@ const firebaseConfig = {
             </select>
           </label>
           <label>Icon
-            <select id="newDebtIcon">
+            <select id="newCardIcon">
               <option>💳</option>
-              <option>🏠</option>
-              <option>🚗</option>
-              <option>🏍️</option>
+              <option>🔷</option>
               <option>💰</option>
             </select>
           </label>
         </div>
         <div class="actions">
-          <button class="btn" id="addDebtSave" onclick="saveDebtItem()">Add to profile</button>
-          <button class="btn secondary" id="addDebtCancel" onclick="cancelEditDebt()" hidden>Cancel edit</button>
+          <button class="btn" id="addCardSave" onclick="saveCardItem()">Add card</button>
+          <button class="btn secondary" id="addCardCancel" onclick="cancelEditCard()" hidden>Cancel edit</button>
         </div>
       </details>
-    </div>
-
-
-    <div class="card" style="margin-top:16px">
-      <h2 class="section-title">YOUR CARDS AND DEBTS</h2>
-      <table class="table">
-        <thead><tr><th>Name</th><th class="hideMobile">Type</th><th>Balance</th><th class="hideMobile">Repayment</th><th>Next Date</th><th></th></tr></thead>
-        <tbody id="profileDebtsTable"></tbody>
+      <table class="table" style="margin-top:16px">
+        <thead><tr><th>Name</th><th>Balance</th><th class="hideMobile">Repayment</th><th>Next Date</th><th></th></tr></thead>
+        <tbody id="profileCardsTable"></tbody>
       </table>
     </div>
+
+    <div class="card" style="margin-top:16px">
+      <h2 class="section-title">LOANS</h2>
+      <details class="fnSettings" id="addLoanDetails">
+        <summary>Add a loan</summary>
+        <h2 class="section-title" id="addLoanTitle" style="margin-top:14px">ADD A LOAN</h2>
+        <div class="profileBox">
+          <label>Type
+            <select id="newLoanType">
+              <option>Mortgage</option>
+              <option>Car Loan</option>
+              <option>Personal Loan</option>
+              <option>Other Loan</option>
+            </select>
+          </label>
+          <label>Name<input id="newLoanName" placeholder="Example: Motorbike Loan"></label>
+          <label>Original Loan Amount incl. interest<input id="newLoanTotal" type="number" step="0.01"></label>
+          <label>Amount Already Paid<input id="newLoanPaid" type="number" step="0.01"></label>
+          <label>First Payment Date<input id="newLoanStartDate" type="date"></label>
+          <label>Payment Amount<input id="newLoanPayment" type="number" step="0.01"></label>
+          <label>Repayment Cycle
+            <select id="newLoanRepeat">
+              <option>Fortnightly</option>
+              <option>Monthly</option>
+              <option>Weekly</option>
+              <option>Yearly</option>
+            </select>
+          </label>
+          <label>Term Months<input id="newLoanTermMonths" type="number"></label>
+          <label>Colour
+            <select id="newLoanColor">
+              <option value="#87c64a">Green</option>
+              <option value="#2f77d0">Blue</option>
+              <option value="#8e35b8">Purple</option>
+              <option value="#d71920">Red</option>
+              <option value="#f59e0b">Orange</option>
+              <option value="#14b8a6">Teal</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn" id="addLoanSave" onclick="saveLoanItem()">Add loan</button>
+          <button class="btn secondary" id="addLoanCancel" onclick="cancelEditLoan()" hidden>Cancel edit</button>
+        </div>
+      </details>
+      <table class="table" style="margin-top:16px">
+        <thead><tr><th>Name</th><th class="hideMobile">Type</th><th>Remaining</th><th class="hideMobile">Payment</th><th>Next Date</th><th></th></tr></thead>
+        <tbody id="profileLoansTable"></tbody>
+      </table>
+    </div>
+
     <div class="card" style="margin-top:16px">
       <h2 class="section-title">DATA</h2>
       <div class="actions">
@@ -792,11 +812,10 @@ const seed = {
   settings:{cashAvailable:0,fortnightlyIncome:0,emergencyTarget:0,emergencyCurrent:0,nextPayday:''},
   debts:[
     {name:'CommBank Mastercard',amount:0,color:'#2f77d0'},
-    {name:'Latitude GEM Visa',amount:0,color:'#8e35b8'},
-    {name:'Motorbike Loan',amount:0,color:'#87c64a'}
+    {name:'Latitude GEM Visa',amount:0,color:'#8e35b8'}
   ],
   bills:[],
-  loan:{total:0,paid:0,startDate:'',paymentAmount:0,termMonths:60}
+  loans:[]
 };
 
 // CLOUD is true once real Firebase config is present. In cloud mode the tracker
@@ -919,10 +938,59 @@ function applyV6Fixes(s){
   s.migrated = 6;
   return true;
 }
+// v7: loans are unified. Previously the Motorbike Loan was a one-off
+// singular field (p.loan) with full amortization tracking (total, paid,
+// start date, term), while any other loan added through the old combined
+// "card, loan or debt" form landed in p.loans[] with a much thinner shape
+// (just a balance, no total/paid/term). That meant only the motorbike ever
+// got a real payoff estimate. This folds both into one p.loans[] array
+// where every entry has the full shape, so any loan you add gets the same
+// tracking the motorbike always had.
+function applyV7Fixes(s){
+  if(Number(s.migrated) >= 7) return false;
+  Object.values(s.profiles || {}).forEach(p=>{
+    if(!Array.isArray(p.loans)) p.loans=[];
+    if(p.loan && (Number(p.loan.total)>0 || Number(p.loan.paid)>0)){
+      const already=p.loans.some(l=>String(l.name||'').toLowerCase().includes('motorbike'));
+      if(!already){
+        p.loans.push({
+          name:'Motorbike Loan',
+          type:'Other Loan',
+          total:Number(p.loan.total)||0,
+          paid:Number(p.loan.paid)||0,
+          startDate:p.loan.startDate||'',
+          paymentAmount:Number(p.loan.paymentAmount)||0,
+          repeat:'Fortnightly',
+          termMonths:Number(p.loan.termMonths)||60,
+          color:'#87c64a'
+        });
+      }
+    }
+    // Old thin loan entries (from the generic add-debt form) used
+    // original/balance/repayment/date instead of total/paid/paymentAmount.
+    // Bring them up to the same shape as the motorbike always had.
+    p.loans.forEach(l=>{
+      if(l.total==null){
+        const original=Number(l.original)||Number(l.balance)||0;
+        const balance=Number(l.balance)||0;
+        l.total=original;
+        l.paid=Math.max(0, original-balance);
+        l.paymentAmount=Number(l.repayment)||0;
+        l.startDate=l.startDate||l.date||'';
+        l.termMonths=l.termMonths||60;
+        delete l.original; delete l.balance; delete l.repayment; delete l.date;
+      }
+    });
+    delete p.loan;
+  });
+  s.migrated = 7;
+  return true;
+}
 function applyDataFixes(s){
   const a=applyV5Fixes(s);
   const b=applyV6Fixes(s);
-  return a || b;
+  const c=applyV7Fixes(s);
+  return a || b || c;
 }
 applyDataFixes(store);
 if(!CLOUD) localStorage.setItem(STORE_KEY, JSON.stringify(store));
@@ -1025,13 +1093,31 @@ function showTab(id,btn){ document.querySelectorAll('.page').forEach(p=>p.classL
 function applyTheme(){ const theme=localStorage.getItem('gftTheme')||'light'; document.body.classList.remove('theme-light','theme-dark','theme-system'); document.body.classList.add('theme-'+theme); themeSelect.value=theme; }
 function setTheme(theme){ localStorage.setItem('gftTheme',theme); applyTheme(); }
 
+// Keeps data.debts (the flat list the TOTAL DEBT panel reads) in sync with
+// the two real sources of truth: card balances and loan remaining amounts.
+// Finds the matching debt entry by name and updates it, creating one if a
+// card or loan doesn't have a debt row yet, so cards/loans never need to
+// manage a parallel debts entry by hand.
+function syncDebtFor(name,amount,color,type){
+  let debt=data.debts.find(d=>normalise(d.name)===normalise(name));
+  if(!debt){ debt={name,amount:0,color,type}; data.debts.push(debt); }
+  debt.amount=amount;
+  if(color) debt.color=color;
+  if(type) debt.type=type;
+  return debt;
+}
+
 function syncFigures(){
   data.accounts.forEach(a=>{ a.balance=Number(a.balance)||0; a.limit=Number(a.limit)||0; a.min=Number(a.min)||0; a.available=Math.max(0,a.limit-a.balance); });
-  if(!data.loan) data.loan={total:0,paid:0,paymentAmount:0,termMonths:60,startDate:''};
-  data.loan.total=Number(data.loan.total)||0; data.loan.paid=Math.min(Number(data.loan.paid)||0,data.loan.total);
-  const loanRemaining=Math.max(data.loan.total-data.loan.paid,0);
-  const motorDebt=data.debts.find(d=>normalise(d.name).includes('motorbike'));
-  if(motorDebt) motorDebt.amount=loanRemaining;
+  data.accounts.forEach(a=>syncDebtFor(a.name, a.balance, a.color, 'Credit Card'));
+
+  if(!Array.isArray(data.loans)) data.loans=[];
+  data.loans.forEach(l=>{
+    l.total=Number(l.total)||0;
+    l.paid=Math.min(Number(l.paid)||0, l.total);
+    syncDebtFor(l.name, Math.max(l.total-l.paid,0), l.color, l.type);
+  });
+
   data.debts.forEach(d=>d.amount=Number(d.amount)||0);
 }
 
@@ -1051,8 +1137,9 @@ function paymentMatches(desc,name){
 function applyPaymentToBalances(payment){
   const amount=Number(payment.amount)||0;
   if(amount<=0) return;
-  if(normalise(payment.description).includes('motorbike')){
-    data.loan.paid=Math.min(data.loan.total,(Number(data.loan.paid)||0)+amount);
+  const loan=data.loans.find(l=>paymentMatches(payment.description,l.name));
+  if(loan){
+    loan.paid=Math.min(loan.total,(Number(loan.paid)||0)+amount);
     syncFigures();
     return;
   }
@@ -1376,26 +1463,35 @@ function render(){
     (function(){
       const panel=document.getElementById('loanPanel');
       if(!panel) return;
-      const total=Number(data.loan.total)||0;
-      const paid=Number(data.loan.paid)||0;
-      const remain=Math.max(total-paid,0);
-      const pct=total>0?Math.min(100,paid/total*100):0;
-      const bike=data.bills.find(b=>String(b.description).toLowerCase().includes('motorbike'));
-      const nextDebit=bike?niceDate(nextDate(bike)):'Not set';
-      panel.innerHTML=`
-        <div class="loanTop">
-          <div>
-            <div class="label">Remaining</div>
-            <div class="fnBig">${money(remain)}</div>
-            <div class="fnSub">${money(paid)} paid of ${money(total)}</div>
+      const loans=data.loans||[];
+      if(!loans.length){
+        panel.innerHTML='<div class="fnSub">No loans recorded. Add one under Payments &amp; Setup.</div>';
+        return;
+      }
+      panel.innerHTML=loans.map((l,i)=>{
+        const total=Number(l.total)||0;
+        const paid=Number(l.paid)||0;
+        const remain=Math.max(total-paid,0);
+        const pct=total>0?Math.min(100,paid/total*100):0;
+        const bill=data.bills.find(b=>paymentMatches(b.description,l.name));
+        const nextDebit=bill?niceDate(nextDate(bill)):'Not set';
+        const divStyle=i>0?' style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)"':'';
+        return `<div${divStyle}>
+          <div class="loanTop">
+            <div>
+              <div class="label">${escHtml(l.name)}</div>
+              <div class="fnBig">${money(remain)}</div>
+              <div class="fnSub">${money(paid)} paid of ${money(total)}</div>
+            </div>
+            <div class="loanPct"><b>${pct.toFixed(1)}%</b><span>paid off</span></div>
           </div>
-          <div class="loanPct"><b>${pct.toFixed(1)}%</b><span>paid off</span></div>
-        </div>
-        <div class="progressOuter" style="margin:14px 0 6px"><div class="progressInner" style="width:${pct}%"></div></div>
-        <div class="subgrid" style="margin-top:14px">
-          <div><div class="label">Fortnightly payment</div><b>${money(data.loan.paymentAmount)}</b></div>
-          <div><div class="label">Next debit</div><b>${nextDebit}</b></div>
+          <div class="progressOuter" style="margin:14px 0 6px"><div class="progressInner" style="width:${pct}%"></div></div>
+          <div class="subgrid" style="margin-top:14px">
+            <div><div class="label">Payment</div><b>${money(l.paymentAmount)} <span class="fnDue">${escHtml(l.repeat||'Fortnightly')}</span></b></div>
+            <div><div class="label">Next debit</div><b>${nextDebit}</b></div>
+          </div>
         </div>`;
+      }).join('');
     })();
 
     (function(){
@@ -1411,25 +1507,28 @@ function render(){
 
       // Reuse the fortnight model so this can never disagree with the card above.
       // cardsPayTotal is what you actually pay the cards this fortnight.
-      // The motorbike loan is modelled separately from the cards: its
-      // paymentAmount is committed to the loan specifically, so it can't
+      // Loans are modelled separately from the cards: each loan's
+      // paymentAmount is committed to that loan specifically, so it can't
       // actually pay off sooner just because card debt happens to be lower.
-      // The loan finishes on its own contractual schedule (start + term),
+      // Each loan finishes on its own contractual schedule (start + term),
       // never earlier — the true "debt free" date is the later of that and
       // whenever the cards clear at the current card repayment rate.
       const f=getFortnight();
-      const cardDebts=debts.filter(d=>!/motorbike/i.test(d.name));
+      const loanNames=new Set((data.loans||[]).map(l=>normalise(l.name)));
+      const cardDebts=debts.filter(d=>!loanNames.has(normalise(d.name)));
       const cardDebtTotal=cardDebts.reduce((s,d)=>s+Number(d.amount||0),0);
       const cardRepay=f.cardsPayTotal;
       const cardFns=cardRepay>0?Math.ceil(cardDebtTotal/cardRepay):0;
       const cardsClear=cardFns?(()=>{const d=new Date(today());d.setDate(d.getDate()+cardFns*14);return d;})():null;
 
-      const hasLoan=debts.some(d=>/motorbike/i.test(d.name)) && Number(data.loan.total)>0;
-      const loanClear=hasLoan?(()=>{const d=new Date(parseDate(data.loan.startDate||iso(today())));d.setMonth(d.getMonth()+(Number(data.loan.termMonths)||60));return d;})():null;
+      const loanClears=(data.loans||[]).filter(l=>Number(l.total)>0).map(l=>{
+        const d=new Date(parseDate(l.startDate||iso(today())));
+        d.setMonth(d.getMonth()+(Number(l.termMonths)||60));
+        return d;
+      });
 
-      const repay=cardRepay + (Number(data.loan.paymentAmount)||0);
-      const clear=[cardsClear,loanClear].filter(Boolean).sort((a,b)=>b-a)[0] || null;
-      const fns=clear?Math.ceil((clear-today())/(14*86400000)):0;
+      const repay=cardRepay + (data.loans||[]).reduce((s,l)=>s+(Number(l.paymentAmount)||0),0);
+      const clear=[cardsClear,...loanClears].filter(Boolean).sort((a,b)=>b-a)[0] || null;
       const yrs=clear?Math.floor((clear-today())/(365*86400000)):0;
       const mos=clear?Math.round((((clear-today())/86400000)%365)/30.44):0;
       const span=clear?(yrs?yrs+'y '+mos+'m':mos+'m'):'--';
@@ -1445,14 +1544,15 @@ function render(){
       const pct=floored.slice();
       for(let k=0;k<remainder;k++) pct[order[k]]++;
 
-      // How much of each debt is already paid off. The motorbike loan has a
-      // real original amount to compare against (data.loan.total). Cards
-      // don't, a limit isn't the same thing as what you originally owed, so
-      // for those "paid off" is measured against the credit limit instead,
+      // How much of each debt is already paid off. A loan has a real
+      // original amount to compare against (its total). Cards don't, a
+      // limit isn't the same thing as what you originally owed, so for
+      // those "paid off" is measured against the credit limit instead,
       // clearly labelled as such, or left untracked if there's no limit set.
       const paidInfo=debts.map(d=>{
-        if(/motorbike/i.test(d.name) && Number(data.loan.total)>0){
-          const paid=Number(data.loan.paid)||0, orig=Number(data.loan.total);
+        const loan=(data.loans||[]).find(l=>normalise(l.name)===normalise(d.name));
+        if(loan && Number(loan.total)>0){
+          const paid=Number(loan.paid)||0, orig=Number(loan.total);
           return {paid, of:orig, label:'of original loan', pct:orig?paid/orig*100:0, tracked:true};
         }
         const account=data.accounts.find(a=>normalise(a.name)===normalise(d.name)||paymentMatches(d.name,a.name));
@@ -1498,27 +1598,32 @@ function render(){
         <div class="fnSub" style="margin-top:10px">Estimate assumes repayments stay the same and ignores future interest.</div>`;
     })();
 
-    const loanRemain=Math.max((Number(data.loan.total)||0)-(Number(data.loan.paid)||0),0);
-    loanTotalInput.value=data.loan.total||0; loanPaidInput.value=data.loan.paid||0; loanRemainingInput.value=loanRemain.toFixed(2); loanStartDateInput.value=data.loan.startDate||''; loanPaymentAmountInput.value=data.loan.paymentAmount||0; loanTermMonthsInput.value=data.loan.termMonths||60;
-
-    if(document.getElementById('loanSummaryNotice')){
-      const loanBill=data.bills.find(b=>/motorbike/i.test(b.description));
-      const nextDebit=loanBill?niceDate(nextDate(loanBill)):'Not set';
-      loanSummaryNotice.innerHTML=`<b>Current setup:</b> total including interest ${money(data.loan.total||0)}, first payment ${data.loan.startDate?niceDate(parseDate(data.loan.startDate)):'not set'}, fortnightly payment ${money(data.loan.paymentAmount||0)}. <b>Next debit:</b> ${nextDebit}, then fortnightly every second week from that date.`;
-    }
-    
-    if(document.getElementById('profileDebtsTable')){
-      profileDebtsTable.innerHTML=data.debts.map((d,i)=>{
-        const bill=data.bills.find(b=>paymentMatches(b.description,d.name) || normalise(b.description)===normalise(d.name));
+    if(document.getElementById('profileCardsTable')){
+      profileCardsTable.innerHTML=data.accounts.map((a,i)=>{
+        const bill=data.bills.find(b=>paymentMatches(b.description,a.name));
         return `<tr>
-          <td><b>${escHtml(d.name)}</b><span class="fnMinMobile">${bill ? money(bill.amount)+' repayment' : 'no repayment set'}</span></td>
-          <td class="hideMobile">${escHtml(d.type || (d.name.toLowerCase().includes('card')?'Credit Card':'Loan'))}</td>
-          <td>${money(d.amount)}</td>
+          <td><b>${escHtml(a.name)}</b><span class="fnMinMobile">${bill ? money(bill.amount)+' repayment' : 'no repayment set'}</span></td>
+          <td>${money(a.balance)}</td>
           <td class="hideMobile">${bill ? money(bill.amount) : '$0.00'}</td>
           <td>${bill ? `<span class="hideMobile">${niceDate(nextDate(bill))}</span><span class="onlyMobile">${shortDate(nextDate(bill))}</span>` : 'Not set'}</td>
-          <td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" onclick="editDebtItem(${i})">Edit</button><button class="btn secondary" onclick="deleteDebtItem(${i})">Delete</button></td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" onclick="editCardItem(${i})">Edit</button><button class="btn secondary" onclick="deleteCardItem(${i})">Delete</button></td>
         </tr>`;
-      }).join('');
+      }).join('') || '<tr><td colspan="5">No cards yet. Use Add a card above.</td></tr>';
+    }
+
+    if(document.getElementById('profileLoansTable')){
+      profileLoansTable.innerHTML=(data.loans||[]).map((l,i)=>{
+        const remain=Math.max((Number(l.total)||0)-(Number(l.paid)||0),0);
+        const bill=data.bills.find(b=>paymentMatches(b.description,l.name));
+        return `<tr>
+          <td><b>${escHtml(l.name)}</b><span class="fnMinMobile">${money(l.paymentAmount)} ${escHtml(l.repeat||'')}</span></td>
+          <td class="hideMobile">${escHtml(l.type||'Loan')}</td>
+          <td>${money(remain)}</td>
+          <td class="hideMobile">${money(l.paymentAmount)}</td>
+          <td>${bill ? `<span class="hideMobile">${niceDate(nextDate(bill))}</span><span class="onlyMobile">${shortDate(nextDate(bill))}</span>` : 'Not set'}</td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" onclick="editLoanItem(${i})">Edit</button><button class="btn secondary" onclick="deleteLoanItem(${i})">Delete</button></td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="6">No loans yet. Use Add a loan above.</td></tr>';
     }
 
     setCash.value=data.settings.cashAvailable||0; setIncome.value=data.settings.fortnightlyIncome||0; setSavings.value=(data.settings.fortnightlySavings ?? DEFAULT_SAVINGS); setPayday.value=data.settings.nextPayday||'';
@@ -1579,7 +1684,6 @@ function saveBillEntry(){
   entryDialog.close();
 }
 function deleteBill(i){ data.bills.splice(i,1); save(); }
-function saveLoanSettings(){ data.loan.total=+loanTotalInput.value||0; data.loan.paid=Math.min(data.loan.total,+loanPaidInput.value||0); data.loan.startDate=loanStartDateInput.value; data.loan.paymentAmount=+loanPaymentAmountInput.value||0; data.loan.termMonths=+loanTermMonthsInput.value||60; syncFigures(); save(); }
 function saveProfileSettings(){
   data.settings.cashAvailable=+setCash.value||0;
   data.settings.fortnightlyIncome=+setIncome.value||0;
@@ -1599,151 +1703,177 @@ function saveProfileSettings(){
   data.settings.planSet=true;
   syncAutoPayday(); save();
 }
-function blankProfile(name,cash,income,emTarget,emCurrent,payday){ return {updated:new Date().toLocaleDateString(),accounts:[{name:'Credit Card 1',balance:0,min:0,due:'Set date',limit:0,available:0,logo:'💳'},{name:'Credit Card 2',balance:0,min:0,due:'Set date',limit:0,available:0,logo:'🔷'}],settings:{cashAvailable:cash,fortnightlyIncome:income,emergencyTarget:emTarget,emergencyCurrent:emCurrent,nextPayday:payday},debts:[],bills:[],loan:{total:0,paid:0,startDate:'',paymentAmount:0,termMonths:60} }; }
+function blankProfile(name,cash,income,emTarget,emCurrent,payday){ return {updated:new Date().toLocaleDateString(),accounts:[{name:'Credit Card 1',balance:0,min:0,due:'Set date',limit:0,available:0,logo:'💳'},{name:'Credit Card 2',balance:0,min:0,due:'Set date',limit:0,available:0,logo:'🔷'}],settings:{cashAvailable:cash,fortnightlyIncome:income,emergencyTarget:emTarget,emergencyCurrent:emCurrent,nextPayday:payday},debts:[],bills:[],loans:[] }; }
 
-let editingDebtIndex=null;
+// ===== CARDS =====
+let editingCardIndex=null;
 
-function fillDebtForm(v){
-  newDebtType.value=v.type||'Credit Card';
-  newDebtName.value=v.name||'';
-  newDebtBalance.value=v.balance||0;
-  newDebtLimit.value=v.limit||'';
-  newDebtRepayment.value=v.repayment||'';
-  newDebtDate.value=v.date||'';
-  newDebtRepeat.value=v.repeat||'Fortnightly';
-  newDebtColor.value=v.color||'#2f77d0';
+function fillCardForm(v){
+  newCardName.value=v.name||'';
+  newCardBalance.value=v.balance||0;
+  newCardLimit.value=v.limit||'';
+  newCardRepayment.value=v.repayment||'';
+  newCardDate.value=v.date||'';
+  newCardRepeat.value=v.repeat||'Fortnightly';
+  newCardColor.value=v.color||'#2f77d0';
+  newCardIcon.value=v.icon||'💳';
 }
 
-function editDebtItem(i){
-  const d=data.debts[i];
-  if(!d) return;
-  editingDebtIndex=i;
-  const bill=data.bills.find(b=>paymentMatches(b.description,d.name) || normalise(b.description)===normalise(d.name));
-  const account=data.accounts.find(a=>normalise(a.name)===normalise(d.name));
-  fillDebtForm({
-    type: d.type || (account ? 'Credit Card' : 'Other Loan'),
-    name: d.name,
-    balance: d.amount,
-    limit: account ? account.limit : '',
-    repayment: bill ? bill.amount : '',
-    date: bill ? bill.date : '',
-    repeat: bill ? bill.repeat : 'Fortnightly',
-    color: d.color
+function editCardItem(i){
+  const a=data.accounts[i];
+  if(!a) return;
+  editingCardIndex=i;
+  const bill=data.bills.find(b=>paymentMatches(b.description,a.name));
+  fillCardForm({
+    name:a.name, balance:a.balance, limit:a.limit,
+    repayment: bill?bill.amount:a.min, date: bill?bill.date:'', repeat: bill?bill.repeat:'Fortnightly',
+    color:a.color, icon: typeof a.logo==='string' && a.logo.length<=4 ? a.logo : '💳'
   });
-  document.getElementById('addDebtTitle').textContent='EDIT '+d.name.toUpperCase();
-  document.getElementById('addDebtSave').textContent='Save changes';
-  document.getElementById('addDebtCancel').hidden=false;
-  document.getElementById('addDebtDetails').open=true;
-  newDebtName.scrollIntoView({behavior:'smooth', block:'center'});
+  document.getElementById('addCardTitle').textContent='EDIT '+a.name.toUpperCase();
+  document.getElementById('addCardSave').textContent='Save changes';
+  document.getElementById('addCardCancel').hidden=false;
+  document.getElementById('addCardDetails').open=true;
+  newCardName.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
-function cancelEditDebt(){
-  editingDebtIndex=null;
-  newDebtName.value=''; newDebtBalance.value=''; newDebtLimit.value=''; newDebtRepayment.value=''; newDebtDate.value='';
-  document.getElementById('addDebtTitle').textContent='ADD A CARD, LOAN OR DEBT';
-  document.getElementById('addDebtSave').textContent='Add to profile';
-  document.getElementById('addDebtCancel').hidden=true;
+function cancelEditCard(){
+  editingCardIndex=null;
+  newCardName.value=''; newCardBalance.value=''; newCardLimit.value=''; newCardRepayment.value=''; newCardDate.value='';
+  document.getElementById('addCardTitle').textContent='ADD A CARD';
+  document.getElementById('addCardSave').textContent='Add card';
+  document.getElementById('addCardCancel').hidden=true;
 }
 
-function saveDebtItem(){
-  const type=newDebtType.value;
-  const name=(newDebtName.value||type).trim();
-  const balance=+newDebtBalance.value||0;
-  const limit=+newDebtLimit.value||0;
-  const repayment=+newDebtRepayment.value||0;
-  const date=newDebtDate.value||iso(today());
-  const repeat=newDebtRepeat.value;
-  const color=newDebtColor.value||'#2f77d0';
-  const icon=newDebtIcon.value||'💰';
+function saveCardItem(){
+  const name=(newCardName.value||'New card').trim();
+  const balance=+newCardBalance.value||0;
+  const limit=+newCardLimit.value||0;
+  const repayment=+newCardRepayment.value||0;
+  const date=newCardDate.value||iso(today());
+  const repeat=newCardRepeat.value;
+  const color=newCardColor.value||'#2f77d0';
+  const icon=newCardIcon.value||'💳';
 
-  if(editingDebtIndex!=null && data.debts[editingDebtIndex]){
-    const oldName=data.debts[editingDebtIndex].name;
-    data.debts[editingDebtIndex]={name,amount:balance,color,type};
+  if(editingCardIndex!=null && data.accounts[editingCardIndex]){
+    const oldName=data.accounts[editingCardIndex].name;
+    const account=data.accounts[editingCardIndex];
+    account.name=name; account.balance=balance; account.min=repayment;
+    account.due=niceDate(parseDate(date)); account.limit=limit||balance;
+    account.available=Math.max(0,(limit||balance)-balance); account.color=color; account.logo=icon;
 
-    let account=data.accounts.find(a=>normalise(a.name)===normalise(oldName));
-    if(type==='Credit Card'){
-      if(account){
-        account.name=name; account.balance=balance; account.min=repayment;
-        account.due=niceDate(parseDate(date)); account.limit=limit||balance;
-        account.available=Math.max(0,(limit||balance)-balance);
-      } else {
-        data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),logo:icon});
-      }
-    } else if(account){
-      data.accounts=data.accounts.filter(a=>a!==account);
-    }
-
-    const bill=data.bills.find(b=>paymentMatches(b.description,oldName) || normalise(b.description)===normalise(oldName));
+    const bill=data.bills.find(b=>paymentMatches(b.description,oldName));
     if(bill){ bill.description=name; bill.date=date; bill.amount=repayment; bill.repeat=repeat; }
     else { data.bills.push({description:name,date,amount:repayment,repeat}); }
 
-    if(!data.loans) data.loans=[];
-    const loan=data.loans.find(l=>normalise(l.name)===normalise(oldName));
-    const isLoanType=type!=='Credit Card' && (type.includes('Loan') || type==='Mortgage' || type==='Car Loan');
-    if(loan){
-      if(isLoanType){ loan.name=name; loan.type=type; loan.original=limit||balance; loan.balance=balance; loan.repayment=repayment; loan.date=date; loan.repeat=repeat; loan.color=color; }
-      else { data.loans=data.loans.filter(l=>l!==loan); }
-    } else if(isLoanType){
-      data.loans.push({name,type,original:limit||balance,balance,repayment,date,repeat,color});
-    }
+    const debt=data.debts.find(d=>normalise(d.name)===normalise(oldName));
+    if(debt) debt.name=name;
 
-    cancelEditDebt();
-    save();
+    cancelEditCard();
+    syncFigures(); save();
     return;
   }
 
-  data.debts.push({name,amount:balance,color,type});
+  data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),logo:icon,color});
+  data.bills.push({description:name,date,amount:repayment,repeat});
 
-  if(type==='Credit Card'){
-    data.accounts.push({
-      name,
-      balance,
-      min:repayment,
-      due:niceDate(parseDate(date)),
-      limit:limit || balance,
-      available:Math.max(0,(limit||balance)-balance),
-      logo:icon
-    });
-  }
+  cancelEditCard();
+  syncFigures(); save();
+}
 
-  data.bills.push({
-    description:name,
-    date,
-    amount:repayment,
-    repeat
-  });
-
-  if(type!=='Credit Card' && (type.includes('Loan') || type==='Mortgage' || type==='Car Loan')){
-    if(!data.loans) data.loans=[];
-    data.loans.push({
-      name,
-      type,
-      original:limit || balance,
-      balance,
-      repayment,
-      date,
-      repeat,
-      color
-    });
-  }
-
-  newDebtName.value='';
-  newDebtBalance.value='';
-  newDebtLimit.value='';
-  newDebtRepayment.value='';
-  newDebtDate.value='';
+function deleteCardItem(i){
+  const a=data.accounts[i];
+  if(!a) return;
+  if(!confirm('Delete '+a.name+' from this profile?')) return;
+  if(editingCardIndex===i) cancelEditCard();
+  data.accounts.splice(i,1);
+  data.bills=data.bills.filter(b=>!paymentMatches(b.description,a.name));
+  data.debts=data.debts.filter(d=>normalise(d.name)!==normalise(a.name));
   save();
 }
 
-function deleteDebtItem(index){
-  const debt=data.debts[index];
-  if(!debt) return;
-  if(!confirm('Delete '+debt.name+' from this profile?')) return;
-  if(editingDebtIndex===index) cancelEditDebt();
-  data.debts.splice(index,1);
-  data.accounts=data.accounts.filter(a=>normalise(a.name)!==normalise(debt.name));
-  data.bills=data.bills.filter(b=>normalise(b.description)!==normalise(debt.name));
-  if(data.loans) data.loans=data.loans.filter(l=>normalise(l.name)!==normalise(debt.name));
+// ===== LOANS =====
+let editingLoanIndex=null;
+
+function fillLoanForm(v){
+  newLoanType.value=v.type||'Other Loan';
+  newLoanName.value=v.name||'';
+  newLoanTotal.value=v.total||0;
+  newLoanPaid.value=v.paid||0;
+  newLoanStartDate.value=v.startDate||'';
+  newLoanPayment.value=v.paymentAmount||0;
+  newLoanRepeat.value=v.repeat||'Fortnightly';
+  newLoanTermMonths.value=v.termMonths||60;
+  newLoanColor.value=v.color||'#87c64a';
+}
+
+function editLoanItem(i){
+  const l=data.loans[i];
+  if(!l) return;
+  editingLoanIndex=i;
+  fillLoanForm(l);
+  document.getElementById('addLoanTitle').textContent='EDIT '+l.name.toUpperCase();
+  document.getElementById('addLoanSave').textContent='Save changes';
+  document.getElementById('addLoanCancel').hidden=false;
+  document.getElementById('addLoanDetails').open=true;
+  newLoanName.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function cancelEditLoan(){
+  editingLoanIndex=null;
+  newLoanName.value=''; newLoanTotal.value=''; newLoanPaid.value=''; newLoanStartDate.value=''; newLoanPayment.value=''; newLoanTermMonths.value='';
+  document.getElementById('addLoanTitle').textContent='ADD A LOAN';
+  document.getElementById('addLoanSave').textContent='Add loan';
+  document.getElementById('addLoanCancel').hidden=true;
+}
+
+function saveLoanItem(){
+  const type=newLoanType.value;
+  const name=(newLoanName.value||type).trim();
+  const total=+newLoanTotal.value||0;
+  const paid=Math.min(total,+newLoanPaid.value||0);
+  const startDate=newLoanStartDate.value||iso(today());
+  const paymentAmount=+newLoanPayment.value||0;
+  const repeat=newLoanRepeat.value;
+  const termMonths=+newLoanTermMonths.value||60;
+  const color=newLoanColor.value||'#87c64a';
+
+  if(editingLoanIndex!=null && data.loans[editingLoanIndex]){
+    const oldName=data.loans[editingLoanIndex].name;
+    data.loans[editingLoanIndex]={name,type,total,paid,startDate,paymentAmount,repeat,termMonths,color};
+
+    // Only the amount/cadence are kept in sync on the linked bill, never its
+    // date: the bill's date is the rolling next-due date (advanced by
+    // autoRollBills as payments land), while startDate here is the fixed
+    // historical anchor used for the term/payoff estimate. Overwriting one
+    // with the other would either reset "next due" backwards or corrupt the
+    // payoff estimate.
+    const bill=data.bills.find(b=>paymentMatches(b.description,oldName));
+    if(bill){ bill.description=name; bill.amount=paymentAmount; bill.repeat=repeat; }
+    else { data.bills.push({description:name,date:startDate,amount:paymentAmount,repeat}); }
+
+    const debt=data.debts.find(d=>normalise(d.name)===normalise(oldName));
+    if(debt) debt.name=name;
+
+    cancelEditLoan();
+    syncFigures(); save();
+    return;
+  }
+
+  data.loans.push({name,type,total,paid,startDate,paymentAmount,repeat,termMonths,color});
+  data.bills.push({description:name,date:startDate,amount:paymentAmount,repeat});
+
+  cancelEditLoan();
+  syncFigures(); save();
+}
+
+function deleteLoanItem(i){
+  const l=data.loans[i];
+  if(!l) return;
+  if(!confirm('Delete '+l.name+' from this profile?')) return;
+  if(editingLoanIndex===i) cancelEditLoan();
+  data.loans.splice(i,1);
+  data.bills=data.bills.filter(b=>!paymentMatches(b.description,l.name));
+  data.debts=data.debts.filter(d=>normalise(d.name)!==normalise(l.name));
   save();
 }
 
