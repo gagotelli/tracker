@@ -629,7 +629,7 @@ const firebaseConfig = {
   <section id="payments" class="page">
     <div class="grid">
       <div class="card span12">
-        <h2 class="section-title">PAYMENTS</h2>
+        <h2 class="section-title">UPCOMING PAYMENTS</h2>
         <div class="summary"><div>Due next 14 days<strong id="due14"></strong></div><div>Due next 30 days<strong id="due30"></strong></div></div>
         <div class="actions"><button class="btn" onclick="openEntry()">Add payment</button></div>
         <table class="table">
@@ -638,16 +638,106 @@ const firebaseConfig = {
         </table>
         <div class="notice">These are fixed direct debits. Once a due date passes, it rolls forward to the next cycle and updates the matching balance and safe-to-spend automatically, no need to tick anything.</div>
 
-        <div class="fnSubhead">Card debt attack</div>
-        <p class="fnHelp">Set how much you actually want to pay on each card this fortnight. This is separate from the card's real due amount above, it's an extra goal shown on the dashboard, not deducted from Safe to spend, so it's fine to be ambitious.</p>
-        <div id="fnCardPlanInputs" class="profileBox" style="margin-top:12px"></div>
-        <div class="actions"><button class="btn secondary" onclick="saveProfileSettings()">Save debt attack</button></div>
+        <div class="fnSubhead">Cards</div>
+        <details class="fnSettings" id="addCardDetails">
+          <summary>Add a card</summary>
+          <h2 class="section-title" id="addCardTitle" style="margin-top:14px">ADD A CARD</h2>
+          <div class="profileBox">
+            <label>Name<input id="newCardName" placeholder="Example: CommBank Mastercard"></label>
+            <label>Current Balance<input id="newCardBalance" type="number" step="0.01"></label>
+            <label>Limit<input id="newCardLimit" type="number" step="0.01"></label>
+            <label>Repayment Amount<input id="newCardRepayment" type="number" step="0.01"></label>
+            <label>Next Repayment Date<input id="newCardDate" type="date"></label>
+            <label>Repayment Cycle
+              <select id="newCardRepeat">
+                <option>Fortnightly</option>
+                <option>Monthly</option>
+                <option>Weekly</option>
+                <option>Yearly</option>
+              </select>
+            </label>
+            <label>Extra this fortnight<input id="newCardExtra" type="number" step="0.01"><span class="fnHint">Optional debt attack, on top of the repayment above. Shown as a goal, not deducted from Safe to spend.</span></label>
+            <label>Colour
+              <select id="newCardColor">
+                <option value="#2f77d0">Blue</option>
+                <option value="#8e35b8">Purple</option>
+                <option value="#87c64a">Green</option>
+                <option value="#d71920">Red</option>
+                <option value="#f59e0b">Orange</option>
+                <option value="#14b8a6">Teal</option>
+              </select>
+            </label>
+            <label>Icon
+              <select id="newCardIcon">
+                <option>💳</option>
+                <option>🔷</option>
+                <option>💰</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="btn" id="addCardSave" onclick="saveCardItem()">Add card</button>
+            <button class="btn secondary" id="addCardCancel" onclick="cancelEditCard()" hidden>Cancel edit</button>
+          </div>
+        </details>
+        <table class="table" style="margin-top:16px">
+          <thead><tr><th>Name</th><th>Balance</th><th class="hideMobile">Extra</th><th>Next Date</th><th></th></tr></thead>
+          <tbody id="profileCardsTable"></tbody>
+        </table>
+
+        <div class="fnSubhead">Loans</div>
+        <details class="fnSettings" id="addLoanDetails">
+          <summary>Add a loan</summary>
+          <h2 class="section-title" id="addLoanTitle" style="margin-top:14px">ADD A LOAN</h2>
+          <div class="profileBox">
+            <label>Type
+              <select id="newLoanType">
+                <option>Mortgage</option>
+                <option>Car Loan</option>
+                <option>Personal Loan</option>
+                <option>Other Loan</option>
+              </select>
+            </label>
+            <label>Name<input id="newLoanName" placeholder="Example: Motorbike Loan"></label>
+            <label>Original Loan Amount incl. interest<input id="newLoanTotal" type="number" step="0.01"></label>
+            <label>Amount Already Paid<input id="newLoanPaid" type="number" step="0.01"></label>
+            <label>First Payment Date<input id="newLoanStartDate" type="date"></label>
+            <label>Payment Amount<input id="newLoanPayment" type="number" step="0.01"></label>
+            <label>Repayment Cycle
+              <select id="newLoanRepeat">
+                <option>Fortnightly</option>
+                <option>Monthly</option>
+                <option>Weekly</option>
+                <option>Yearly</option>
+              </select>
+            </label>
+            <label>Term Months<input id="newLoanTermMonths" type="number"></label>
+            <label>Colour
+              <select id="newLoanColor">
+                <option value="#87c64a">Green</option>
+                <option value="#2f77d0">Blue</option>
+                <option value="#8e35b8">Purple</option>
+                <option value="#d71920">Red</option>
+                <option value="#f59e0b">Orange</option>
+                <option value="#14b8a6">Teal</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="btn" id="addLoanSave" onclick="saveLoanItem()">Add loan</button>
+            <button class="btn secondary" id="addLoanCancel" onclick="cancelEditLoan()" hidden>Cancel edit</button>
+          </div>
+        </details>
+        <table class="table" style="margin-top:16px">
+          <thead><tr><th>Name</th><th class="hideMobile">Type</th><th>Remaining</th><th class="hideMobile">Payment</th><th>Next Date</th><th></th></tr></thead>
+          <tbody id="profileLoansTable"></tbody>
+        </table>
       </div>
     </div>
 
     <div class="card" style="margin-top:16px">
       <h2 class="section-title">YOUR PLAN</h2>
-      <p class="fnHelp">Safe to spend and the dashboard bars are driven by your live account balance and the bills below. Salary is kept for your own reference.</p>
+      <p class="fnHelp">Safe to spend and the dashboard bars are driven by your live account balance and the bills above. Salary is kept for your own reference.</p>
       <div class="profileBox" style="margin-top:10px">
         <label>Cash in your account now<input id="setCash" type="number" step="0.01"><span class="fnHint">Used only if the bank feed hasn't synced</span></label>
         <label>Fortnightly salary<input id="setIncome" type="number" step="0.01"><span class="fnHint">Reference only</span></label>
@@ -655,104 +745,6 @@ const firebaseConfig = {
         <label>Next payday<input id="setPayday" type="date" readonly title="Calculated from your fortnightly cycle"><span class="fnHint">Calculated automatically</span></label>
       </div>
       <div class="actions"><button class="btn" onclick="saveProfileSettings()">Save plan</button></div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h2 class="section-title">CARDS</h2>
-      <details class="fnSettings" id="addCardDetails">
-        <summary>Add a card</summary>
-        <h2 class="section-title" id="addCardTitle" style="margin-top:14px">ADD A CARD</h2>
-        <div class="profileBox">
-          <label>Name<input id="newCardName" placeholder="Example: CommBank Mastercard"></label>
-          <label>Current Balance<input id="newCardBalance" type="number" step="0.01"></label>
-          <label>Limit<input id="newCardLimit" type="number" step="0.01"></label>
-          <label>Repayment Amount<input id="newCardRepayment" type="number" step="0.01"></label>
-          <label>Next Repayment Date<input id="newCardDate" type="date"></label>
-          <label>Repayment Cycle
-            <select id="newCardRepeat">
-              <option>Fortnightly</option>
-              <option>Monthly</option>
-              <option>Weekly</option>
-              <option>Yearly</option>
-            </select>
-          </label>
-          <label>Colour
-            <select id="newCardColor">
-              <option value="#2f77d0">Blue</option>
-              <option value="#8e35b8">Purple</option>
-              <option value="#87c64a">Green</option>
-              <option value="#d71920">Red</option>
-              <option value="#f59e0b">Orange</option>
-              <option value="#14b8a6">Teal</option>
-            </select>
-          </label>
-          <label>Icon
-            <select id="newCardIcon">
-              <option>💳</option>
-              <option>🔷</option>
-              <option>💰</option>
-            </select>
-          </label>
-        </div>
-        <div class="actions">
-          <button class="btn" id="addCardSave" onclick="saveCardItem()">Add card</button>
-          <button class="btn secondary" id="addCardCancel" onclick="cancelEditCard()" hidden>Cancel edit</button>
-        </div>
-      </details>
-      <table class="table" style="margin-top:16px">
-        <thead><tr><th>Name</th><th>Balance</th><th class="hideMobile">Repayment</th><th>Next Date</th><th></th></tr></thead>
-        <tbody id="profileCardsTable"></tbody>
-      </table>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h2 class="section-title">LOANS</h2>
-      <details class="fnSettings" id="addLoanDetails">
-        <summary>Add a loan</summary>
-        <h2 class="section-title" id="addLoanTitle" style="margin-top:14px">ADD A LOAN</h2>
-        <div class="profileBox">
-          <label>Type
-            <select id="newLoanType">
-              <option>Mortgage</option>
-              <option>Car Loan</option>
-              <option>Personal Loan</option>
-              <option>Other Loan</option>
-            </select>
-          </label>
-          <label>Name<input id="newLoanName" placeholder="Example: Motorbike Loan"></label>
-          <label>Original Loan Amount incl. interest<input id="newLoanTotal" type="number" step="0.01"></label>
-          <label>Amount Already Paid<input id="newLoanPaid" type="number" step="0.01"></label>
-          <label>First Payment Date<input id="newLoanStartDate" type="date"></label>
-          <label>Payment Amount<input id="newLoanPayment" type="number" step="0.01"></label>
-          <label>Repayment Cycle
-            <select id="newLoanRepeat">
-              <option>Fortnightly</option>
-              <option>Monthly</option>
-              <option>Weekly</option>
-              <option>Yearly</option>
-            </select>
-          </label>
-          <label>Term Months<input id="newLoanTermMonths" type="number"></label>
-          <label>Colour
-            <select id="newLoanColor">
-              <option value="#87c64a">Green</option>
-              <option value="#2f77d0">Blue</option>
-              <option value="#8e35b8">Purple</option>
-              <option value="#d71920">Red</option>
-              <option value="#f59e0b">Orange</option>
-              <option value="#14b8a6">Teal</option>
-            </select>
-          </label>
-        </div>
-        <div class="actions">
-          <button class="btn" id="addLoanSave" onclick="saveLoanItem()">Add loan</button>
-          <button class="btn secondary" id="addLoanCancel" onclick="cancelEditLoan()" hidden>Cancel edit</button>
-        </div>
-      </details>
-      <table class="table" style="margin-top:16px">
-        <thead><tr><th>Name</th><th class="hideMobile">Type</th><th>Remaining</th><th class="hideMobile">Payment</th><th>Next Date</th><th></th></tr></thead>
-        <tbody id="profileLoansTable"></tbody>
-      </table>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -1150,31 +1142,8 @@ function applyPaymentToBalances(payment){
   syncFigures();
 }
 
-const CARD_WORDS=['commbank','mastercard','gem','visa','latitude'];
-const isCardPayment=d=>CARD_WORDS.some(w=>String(d||'').toLowerCase().includes(w));
-
 // Your existing habit payments, used only until you set your own in Settings.
 const DEFAULT_SAVINGS=270;
-
-// Whether a card's statement minimum is worth tracking. Balance Sync scrapes it,
-// but if a card's minimum is unreliable or you simply don't care, turn it off and
-// the card shows only what you pay. Seed values apply until you save Setup once.
-function defaultMinTracked(desc){
-  const d=String(desc||'').toLowerCase();
-  if(d.includes('commbank')||d.includes('mastercard')) return false;
-  return true;
-}
-function minTracked(desc){
-  const map=data.settings.cardMinTracked||{};
-  return (desc in map) ? !!map[desc] : defaultMinTracked(desc);
-}
-
-function defaultCardPay(desc,minimum){
-  const d=String(desc||'').toLowerCase();
-  if(d.includes('commbank')||d.includes('mastercard')) return 350;
-  if(d.includes('gem')||d.includes('latitude')) return 300;
-  return minimum;
-}
 
 // Single source of truth for the fortnight. Everything on the dashboard reads
 // from this, so the numbers can never disagree with each other again.
@@ -1196,20 +1165,18 @@ function getFortnight(){
   // its own bill it lands here too and reduces Safe automatically.
   const fixed=items;
 
-  // Card items are pulled out separately purely to estimate a payoff date
-  // for the debt panel further down. This total is never subtracted a
-  // second time from Safe, it's already counted above as part of fixed.
-  const plans=data.settings.cardPlans||{};
-  const cardRows=items.filter(b=>isCardPayment(b.description)).map(b=>{
-    const base=Number(b.amount||0);            // the scheduled amount on the bill
-    const tracked=minTracked(b.description);
-    const minimum=tracked?base:null;           // null means "no minimum on file"
-    const saved=Number(plans[b.description]);
-    // Pay whatever's on the bill in the Payments tab, unless you've specifically
-    // overridden this card's repayment amount under Setup -> Card repayments.
-    // No more hidden hardcoded defaults fighting what you actually entered.
-    const pay=Number.isFinite(saved)&&saved>0 ? saved : base;
-    return {...b, minimum, tracked, pay, extra:minimum==null?null:pay-minimum};
+  // Extra you're paying on each card this fortnight (the debt attack), set
+  // directly on the card itself under Payments & Setup -> Cards. Built from
+  // every card you have, not from bills filtered to this exact 14-day
+  // window: card bills are often monthly, so a window-based list would go
+  // empty most of the time depending on where in the month you're looking.
+  // This total is never subtracted a second time from Safe, the bill amount
+  // is already counted above as part of fixed.
+  const cardRows=data.accounts.map(a=>{
+    const bill=data.bills.find(b=>paymentMatches(b.description,a.name));
+    const base=bill?Number(bill.amount)||0:0;
+    const extra=Number(a.extra)||0;
+    return {name:a.name, base, extra, pay:base+extra};
   });
 
   const salary=Number(data.settings.fortnightlyIncome)||0;
@@ -1224,7 +1191,6 @@ function getFortnight(){
   const savings=Number(data.settings.fortnightlySavings ?? DEFAULT_SAVINGS)||0;
 
   const fixedTotal=fixed.reduce((s,b)=>s+Number(b.amount||0),0);
-  const cardsMinTotal=cardRows.reduce((s,b)=>s+(b.minimum||0),0);
   const cardsPayTotal=cardRows.reduce((s,b)=>s+b.pay,0);
 
   const committed=fixedTotal;
@@ -1242,7 +1208,7 @@ function getFortnight(){
     .reduce((s,b)=>s+Number(b.amount||0),0);
 
   return {payday,following,fixed,cardRows,salary,cash,savings,
-          fixedTotal,cardsMinTotal,cardsPayTotal,committed,safe,daily,dueBeforePayday};
+          fixedTotal,cardsPayTotal,committed,safe,daily,dueBeforePayday};
 }
 
 /* PocketSmith reports liabilities as negative. Render them the way the bank
@@ -1350,11 +1316,11 @@ function renderFortnight(){
   set('fnFixedTotal',money(f.fixedTotal));
   set('fnFixedSub',money(f.fixedTotal));
 
-  // Debt attack: extra you've chosen to pay on top of each card's real bill
-  // amount, set under Payments & Setup -> Your plan -> Card debt attack.
-  // Same treatment as the savings goal: shown here so it's visible, but
-  // never subtracted from Safe to spend, since neither is an actual bill.
-  const attackTotal=f.cardRows.reduce((s,b)=>s+Math.max(0,b.pay-Number(b.amount||0)),0);
+  // Debt attack: extra you've chosen to pay on each card, set directly on
+  // the card itself under Payments & Setup -> Cards. Same treatment as the
+  // savings goal: shown here so it's visible, but never subtracted from
+  // Safe to spend, since neither is an actual bill.
+  const attackTotal=f.cardRows.reduce((s,r)=>s+r.extra,0);
   set('fnSavingsGoal',money(f.savings));
   set('fnDebtGoal',money(attackTotal));
 
@@ -1383,19 +1349,6 @@ function renderFortnight(){
       warn.style.display='none';
     }
   }
-
-  const box=document.getElementById('fnCardPlanInputs');
-  if(box) box.innerHTML=f.cardRows.map(b=>{
-    const hint = !b.tracked  ? 'Minimum not tracked for this card'
-               : b.extra>0   ? `Minimum ${money(b.minimum)} · paying ${money(b.extra)} extra`
-               : b.extra<0   ? `Below the minimum of ${money(b.minimum)}`
-               :               `Minimum ${money(b.minimum)}`;
-    const bad=(b.extra!=null && b.extra<0) ? ' bad' : '';
-    return `<label>${escHtml(b.description)}
-      <input type="number" step="0.01" data-card="${escAttr(b.description)}" value="${b.pay}">
-      <span class="fnHint${bad}">${hint}</span>
-      <span class="fnCheck"><input type="checkbox" data-mintrack="${escAttr(b.description)}" ${b.tracked?'checked':''}> Track statement minimum</span></label>`;
-  }).join('');
 }
 
 function render(){
@@ -1601,10 +1554,11 @@ function render(){
     if(document.getElementById('profileCardsTable')){
       profileCardsTable.innerHTML=data.accounts.map((a,i)=>{
         const bill=data.bills.find(b=>paymentMatches(b.description,a.name));
+        const extraTag=a.extra>0?' + '+money(a.extra)+' extra':'';
         return `<tr>
-          <td><b>${escHtml(a.name)}</b><span class="fnMinMobile">${bill ? money(bill.amount)+' repayment' : 'no repayment set'}</span></td>
+          <td><b>${escHtml(a.name)}</b><span class="fnMinMobile">${bill ? money(bill.amount)+' repayment' : 'no repayment set'}${extraTag}</span></td>
           <td>${money(a.balance)}</td>
-          <td class="hideMobile">${bill ? money(bill.amount) : '$0.00'}</td>
+          <td class="hideMobile">${a.extra>0?money(a.extra):'—'}</td>
           <td>${bill ? `<span class="hideMobile">${niceDate(nextDate(bill))}</span><span class="onlyMobile">${shortDate(nextDate(bill))}</span>` : 'Not set'}</td>
           <td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" onclick="editCardItem(${i})">Edit</button><button class="btn secondary" onclick="deleteCardItem(${i})">Delete</button></td>
         </tr>`;
@@ -1688,18 +1642,6 @@ function saveProfileSettings(){
   data.settings.cashAvailable=+setCash.value||0;
   data.settings.fortnightlyIncome=+setIncome.value||0;
   data.settings.fortnightlySavings=+setSavings.value||0;
-  const plans={};
-  document.querySelectorAll('#fnCardPlanInputs input[data-card]').forEach(i=>{
-    const v=+i.value; if(v>0) plans[i.dataset.card]=v;
-  });
-  data.settings.cardPlans=plans;
-
-  const tracked={};
-  document.querySelectorAll('#fnCardPlanInputs input[data-mintrack]').forEach(i=>{
-    tracked[i.dataset.mintrack]=i.checked;
-  });
-  data.settings.cardMinTracked=tracked;
-
   data.settings.planSet=true;
   syncAutoPayday(); save();
 }
@@ -1715,6 +1657,7 @@ function fillCardForm(v){
   newCardRepayment.value=v.repayment||'';
   newCardDate.value=v.date||'';
   newCardRepeat.value=v.repeat||'Fortnightly';
+  newCardExtra.value=v.extra||'';
   newCardColor.value=v.color||'#2f77d0';
   newCardIcon.value=v.icon||'💳';
 }
@@ -1727,7 +1670,7 @@ function editCardItem(i){
   fillCardForm({
     name:a.name, balance:a.balance, limit:a.limit,
     repayment: bill?bill.amount:a.min, date: bill?bill.date:'', repeat: bill?bill.repeat:'Fortnightly',
-    color:a.color, icon: typeof a.logo==='string' && a.logo.length<=4 ? a.logo : '💳'
+    extra:a.extra, color:a.color, icon: typeof a.logo==='string' && a.logo.length<=4 ? a.logo : '💳'
   });
   document.getElementById('addCardTitle').textContent='EDIT '+a.name.toUpperCase();
   document.getElementById('addCardSave').textContent='Save changes';
@@ -1738,7 +1681,7 @@ function editCardItem(i){
 
 function cancelEditCard(){
   editingCardIndex=null;
-  newCardName.value=''; newCardBalance.value=''; newCardLimit.value=''; newCardRepayment.value=''; newCardDate.value='';
+  newCardName.value=''; newCardBalance.value=''; newCardLimit.value=''; newCardRepayment.value=''; newCardDate.value=''; newCardExtra.value='';
   document.getElementById('addCardTitle').textContent='ADD A CARD';
   document.getElementById('addCardSave').textContent='Add card';
   document.getElementById('addCardCancel').hidden=true;
@@ -1751,6 +1694,7 @@ function saveCardItem(){
   const repayment=+newCardRepayment.value||0;
   const date=newCardDate.value||iso(today());
   const repeat=newCardRepeat.value;
+  const extra=Math.max(0,+newCardExtra.value||0);
   const color=newCardColor.value||'#2f77d0';
   const icon=newCardIcon.value||'💳';
 
@@ -1759,7 +1703,7 @@ function saveCardItem(){
     const account=data.accounts[editingCardIndex];
     account.name=name; account.balance=balance; account.min=repayment;
     account.due=niceDate(parseDate(date)); account.limit=limit||balance;
-    account.available=Math.max(0,(limit||balance)-balance); account.color=color; account.logo=icon;
+    account.available=Math.max(0,(limit||balance)-balance); account.color=color; account.logo=icon; account.extra=extra;
 
     const bill=data.bills.find(b=>paymentMatches(b.description,oldName));
     if(bill){ bill.description=name; bill.date=date; bill.amount=repayment; bill.repeat=repeat; }
@@ -1773,7 +1717,7 @@ function saveCardItem(){
     return;
   }
 
-  data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),logo:icon,color});
+  data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),logo:icon,color,extra});
   data.bills.push({description:name,date,amount:repayment,repeat});
 
   cancelEditCard();
