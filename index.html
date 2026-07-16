@@ -1951,27 +1951,31 @@ function loadSpendHistory(){
     });
 }
 
-// Transactions excluded from the spending chart: confirmed data artifacts or
-// transfers between your own accounts, neither of which is real spending.
-// Checked by hand rather than auto-detected, since guessing which
-// transactions to drop isn't safe.
-//
-// 1928246835: "ONLINE SERVICE CENTRE PAYMENT REVERSAL" -$7,763.89 on
-// 2026-06-11, Latitude. A reversal should credit money back (positive), not
-// debit it - backwards sign, matches the known old Latitude sync bug
-// (see the v4 migration notes above), not an actual purchase.
-//
-// 1927004230: "Direct Debit ... GEM VISA ..." -$7,763.89 on 2026-06-15,
-// CommBank - the same amount as the reversal above. This is you paying
-// down your own Latitude card from CommBank, not external spending.
-//
-// 1927004285 / 1927004280 / 1927002250: "Transfer to xx2235/xx5846/xx0678
-// CommBank app", -$500/-$400/-$300. xx5846 matches the Bills account's own
-// number, and all three share the same masked-account-number-only pattern
-// with no merchant or payee name - unlike every real purchase in this
-// history, which always shows an actual business or payee. Almost
-// certainly moving money between your own accounts.
-const EXCLUDED_TXN_IDS=new Set([1928246835, 1927004230, 1927004285, 1927004280, 1927002250]);
+// One-off data artifact, excluded by exact transaction id since it isn't a
+// recurring category: 1928246835, "ONLINE SERVICE CENTRE PAYMENT REVERSAL"
+// -$7,763.89 on 2026-06-11, Latitude. A reversal should credit money back
+// (positive), not debit it - backwards sign, matches the known old
+// Latitude sync bug (see the v4 migration notes above), not an actual
+// purchase.
+const EXCLUDED_TXN_IDS=new Set([1928246835]);
+
+// Transfers between your own accounts, excluded by payee pattern rather
+// than by id: these recur (a new id and amount every time you make one),
+// so excluding one instance at a time never actually catches the next one.
+//   - "GEM VISA" in the payee: paying down your own Latitude card from
+//     CommBank. Confirmed via a $7,763.89 direct debit matching the exact
+//     amount of the reversal artifact above.
+//   - "Transfer to xx5846": your own Bills account (matches its real
+//     number). Confirmed recurring - seen at $400 and $1,600 so far.
+//   - "Transfer to xx2235" / "Transfer to xx0678": same masked-account,
+//     no-merchant-name pattern as xx5846, unlike every real purchase in
+//     this history, which always shows an actual business or payee name.
+//     Not independently confirmed the way xx5846 is, but the pattern match
+//     is strong enough to treat the same way.
+const EXCLUDED_PAYEE_PATTERNS=[/gem visa/i, /transfer to xx5846/i, /transfer to xx2235/i, /transfer to xx0678/i];
+function isExcludedTxn(t){
+  return EXCLUDED_TXN_IDS.has(t.id) || EXCLUDED_PAYEE_PATTERNS.some(p=>p.test(t.payee||''));
+}
 
 // Weekly spending, stacked by account (CommBank vs Latitude), Monday-start
 // buckets, spending only (positive amounts are income and are excluded).
@@ -2008,7 +2012,7 @@ function renderSpendChart(){
   spendHistory.forEach(t=>{
     const amt=Number(t.amount)||0;
     if(amt>=0 || !t.date) return;
-    if(EXCLUDED_TXN_IDS.has(t.id)) return;
+    if(isExcludedTxn(t)) return;
     const isBank=bankIds.has(t.accountId), isLat=latIds.has(t.accountId);
     if(!isBank && !isLat) return;
     const wk=weekStart(parseDate(t.date));
@@ -2106,7 +2110,7 @@ function renderSpendChart(){
   if(active && active.total>0){
     const wkEnd=new Date(parseDate(active.wk)); wkEnd.setDate(wkEnd.getDate()+6);
     const txns=spendHistory
-      .filter(t=>Number(t.amount)<0 && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && !EXCLUDED_TXN_IDS.has(t.id) && t.date>=active.wk && t.date<=iso(wkEnd))
+      .filter(t=>Number(t.amount)<0 && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && !isExcludedTxn(t) && t.date>=active.wk && t.date<=iso(wkEnd))
       .sort((a,b)=>a.amount-b.amount);
     const isPeak=active.wk===peak.wk;
     detail=`
