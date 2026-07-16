@@ -1,0 +1,23 @@
+name: Deploy to Firebase Hosting
+
+# Deploys index.html to Firebase Hosting on every push to this branch.
+# Requires a FIREBASE_SERVICE_ACCOUNT secret (a Firebase service account
+# JSON key, from Firebase console > Project settings > Service accounts)
+# added under this repo's Settings > Secrets and variables > Actions.
+on:
+  push:
+    branches:
+      - claude/finance-tracker-security-pircna
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
+          projectId: finance-tracker-gg
+          channelId: live
