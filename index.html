@@ -1946,14 +1946,27 @@ function loadSpendHistory(){
     });
 }
 
-// Known-bad transactions to exclude from the spending chart: confirmed data
-// artifacts, not real spending, checked by hand rather than auto-detected
-// since guessing which transactions are "wrong" isn't safe.
+// Transactions excluded from the spending chart: confirmed data artifacts or
+// transfers between your own accounts, neither of which is real spending.
+// Checked by hand rather than auto-detected, since guessing which
+// transactions to drop isn't safe.
+//
 // 1928246835: "ONLINE SERVICE CENTRE PAYMENT REVERSAL" -$7,763.89 on
 // 2026-06-11, Latitude. A reversal should credit money back (positive), not
 // debit it - backwards sign, matches the known old Latitude sync bug
 // (see the v4 migration notes above), not an actual purchase.
-const EXCLUDED_TXN_IDS=new Set([1928246835]);
+//
+// 1927004230: "Direct Debit ... GEM VISA ..." -$7,763.89 on 2026-06-15,
+// CommBank - the same amount as the reversal above. This is you paying
+// down your own Latitude card from CommBank, not external spending.
+//
+// 1927004285 / 1927004280 / 1927002250: "Transfer to xx2235/xx5846/xx0678
+// CommBank app", -$500/-$400/-$300. xx5846 matches the Bills account's own
+// number, and all three share the same masked-account-number-only pattern
+// with no merchant or payee name - unlike every real purchase in this
+// history, which always shows an actual business or payee. Almost
+// certainly moving money between your own accounts.
+const EXCLUDED_TXN_IDS=new Set([1928246835, 1927004230, 1927004285, 1927004280, 1927002250]);
 
 // Weekly spending, stacked by account (CommBank vs Latitude), Monday-start
 // buckets, spending only (positive amounts are income and are excluded).
@@ -2027,16 +2040,32 @@ function renderSpendChart(){
   const xAt=i=> n<=1 ? padL+plotW/2 : padL+(plotW*i/(n-1));
   const yAt=v=> padT+plotH-(Math.max(0,v)/max*plotH);
 
-  const areaPath=(topVals,botVals)=>{
-    const top=topVals.map((v,i)=>`${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`);
-    const bot=botVals.slice().reverse().map((v,i)=>`${xAt(botVals.length-1-i).toFixed(1)},${yAt(v).toFixed(1)}`);
-    return `M ${top.join(' L ')} L ${bot.join(' L ')} Z`;
+  // Smooth cubic-bezier spline through each set of points (a Catmull-Rom
+  // spline converted to bezier segments), instead of sharp straight-line
+  // joins between weeks - reads as an actual trend line rather than a
+  // jagged zig-zag.
+  const curveCmds=pts=>{
+    let d='';
+    for(let i=0;i<pts.length-1;i++){
+      const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+      const c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
+      const c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
+      d+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    return d;
   };
-  const linePath=vals=> `M ${vals.map((v,i)=>`${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(' L ')}`;
+  const smoothLine=pts=> pts.length<2 ? '' : `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`+curveCmds(pts);
+  const smoothArea=(topPts,botPts)=>{
+    const bot=botPts.slice().reverse();
+    return smoothLine(topPts)
+      + ` L ${bot[0][0].toFixed(1)},${bot[0][1].toFixed(1)}`
+      + curveCmds(bot) + ' Z';
+  };
 
-  const zero=rows.map(()=>0);
-  const bankVals=rows.map(r=>r.bank);
-  const totalVals=rows.map(r=>r.total);
+  const pt=(i,v)=>[xAt(i),yAt(v)];
+  const zeroPts=rows.map((r,i)=>pt(i,0));
+  const bankPts=rows.map((r,i)=>pt(i,r.bank));
+  const totalPts=rows.map((r,i)=>pt(i,r.total));
 
   const gridLines=ticks.map(t=>`<line x1="${padL}" y1="${yAt(t).toFixed(1)}" x2="${W-padR}" y2="${yAt(t).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>`).join('');
   const yLabels=ticks.map(t=>`<text x="${padL-8}" y="${(yAt(t)+4).toFixed(1)}" text-anchor="end" class="chartAxis">${money(t)}</text>`).join('');
@@ -2045,14 +2074,24 @@ function renderSpendChart(){
     return `<text x="${xAt(i).toFixed(1)}" y="${H-6}" text-anchor="middle" class="chartAxis">${shortDate(parseDate(r.wk))}</text>`;
   }).join('');
   const dots=rows.map((r,i)=>
-    `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(r.total).toFixed(1)}" r="3" fill="#8e35b8"><title>${shortDate(parseDate(r.wk))}: ${money(r.total)} total (${money(r.bank)} CommBank, ${money(r.lat)} Latitude)</title></circle>`
+    `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(r.total).toFixed(1)}" r="3" fill="var(--card)" stroke="#8e35b8" stroke-width="1.75"><title>${shortDate(parseDate(r.wk))}: ${money(r.total)} total (${money(r.bank)} CommBank, ${money(r.lat)} Latitude)</title></circle>`
   ).join('');
 
   box.innerHTML=`
     <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
+      <defs>
+        <linearGradient id="spendGradBank" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2f77d0" stop-opacity=".4"/>
+          <stop offset="100%" stop-color="#2f77d0" stop-opacity=".04"/>
+        </linearGradient>
+        <linearGradient id="spendGradLat" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#8e35b8" stop-opacity=".4"/>
+          <stop offset="100%" stop-color="#8e35b8" stop-opacity=".04"/>
+        </linearGradient>
+      </defs>
       ${gridLines}
-      <path d="${areaPath(bankVals,zero)}" fill="#2f77d0" fill-opacity=".28" stroke="#2f77d0" stroke-width="2"/>
-      <path d="${areaPath(totalVals,bankVals)}" fill="#8e35b8" fill-opacity=".28" stroke="#8e35b8" stroke-width="2"/>
+      <path d="${smoothArea(bankPts,zeroPts)}" fill="url(#spendGradBank)" stroke="#2f77d0" stroke-width="2" stroke-linejoin="round"/>
+      <path d="${smoothArea(totalPts,bankPts)}" fill="url(#spendGradLat)" stroke="#8e35b8" stroke-width="2" stroke-linejoin="round"/>
       ${dots}
       ${yLabels}
       ${xLabels}
@@ -2061,23 +2100,7 @@ function renderSpendChart(){
       <span><i class="dot" style="background:#2f77d0"></i>CommBank</span>
       <span><i class="dot" style="background:#8e35b8"></i>Latitude</span>
     </div>
-    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>
-    <div id="spendDebug" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)"></div>`;
-
-  // TEMPORARY DEBUG, remove once the remaining spike is identified: lists
-  // every transaction (either account) behind the single biggest week,
-  // largest first, so whatever's still inflating it can be pointed at
-  // exactly instead of guessed at.
-  const peak=rows.slice().sort((a,b)=>b.total-a.total)[0];
-  const dbg=document.getElementById('spendDebug');
-  if(dbg && peak && peak.total>0){
-    const peakEnd=new Date(parseDate(peak.wk)); peakEnd.setDate(peakEnd.getDate()+6);
-    const txns=spendHistory
-      .filter(t=>Number(t.amount)<0 && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && t.date>=peak.wk && t.date<=iso(peakEnd))
-      .sort((a,b)=>a.amount-b.amount);
-    dbg.innerHTML='<div class="fnSub" style="margin-bottom:6px">DEBUG — transactions for week of '+shortDate(parseDate(peak.wk))+':</div>'
-      + txns.map(t=>`<div class="fnSub">${escHtml(t.date)} · ${bankIds.has(t.accountId)?'CommBank':'Latitude'} · ${escHtml(t.payee||'(no payee)')} · ${money(t.amount)} · id ${escHtml(String(t.id))}</div>`).join('');
-  }
+    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>`;
 }
 
 function cloudConfigured(){
