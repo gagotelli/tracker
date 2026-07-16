@@ -195,10 +195,15 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 
 .spendSvg{width:100%;height:auto;display:block;overflow:visible}
 .chartAxis{font-family:var(--mono);font-size:10px;fill:var(--muted)}
-.chartLegend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;margin-top:12px;font-size:12px;color:var(--muted)}
-.chartLegend .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
-.chartLegend b{font-family:var(--mono);color:var(--text);margin-left:5px;font-weight:700}
-.chartHint{margin-left:auto;font-size:11px;letter-spacing:.02em}
+.chartLabel{font-family:var(--mono);font-size:11px;font-weight:700}
+.chartHead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.chartToggle{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
+.chartToggle button{border:none;background:transparent;color:var(--muted);font-family:var(--mono);font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px;cursor:pointer;letter-spacing:.02em;transition:background .15s,color .15s}
+.chartToggle button.active{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
+.chartLegend{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-top:14px}
+.chartBig{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--text)}
+.chartSub{font-size:12px;color:var(--muted)}
+.chartHint{margin-left:auto;font-size:11px;letter-spacing:.02em;color:var(--muted)}
 @media(max-width:520px){.chartHint{margin-left:0;flex-basis:100%}}
 
 /* ===== THIS FORTNIGHT: mobile fit =====
@@ -552,7 +557,10 @@ const firebaseConfig = {
 
     <div class="grid" style="margin-bottom:16px">
       <div class="card span12">
-        <h2 class="section-title">SPENDING BY WEEK</h2>
+        <div class="chartHead">
+          <h2 class="section-title">SPENDING BY WEEK</h2>
+          <div class="chartToggle" id="spendToggle"></div>
+        </div>
         <div id="spendChart"><div class="fnSub">Loading spending history…</div></div>
       </div>
     </div>
@@ -1927,7 +1935,9 @@ function autoSyncBank(){
 let spendHistory=null;
 let spendHistoryError=null;
 let selectedSpendWeek=null; // null = defaults to the highest week
+let spendChartMode='expense'; // 'expense' | 'income'
 function selectSpendWeek(wk){ selectedSpendWeek=wk; renderSpendChart(); }
+function setSpendChartMode(m){ if(m===spendChartMode) return; spendChartMode=m; renderSpendChart(); }
 function loadSpendHistory(){
   if(!window._db || !cloudUser){
     spendHistoryError='Not signed in yet.';
@@ -1975,15 +1985,74 @@ function isExcludedTxn(t){
   return EXCLUDED_TXN_IDS.has(t.id) || EXCLUDED_PAYEE_PATTERNS.some(p=>p.test(t.payee||''));
 }
 
-// Weekly spending, stacked by account (CommBank vs Latitude), Monday-start
-// buckets, spending only (positive amounts are income and are excluded).
+// Monotone cubic (Fritsch-Carlson) Hermite interpolation, converted to
+// bezier segments. Unlike the Catmull-Rom spline this replaced, it never
+// overshoots past a point's own value on the way to its neighbour, so a
+// sharp single-week spike can't make the curve balloon above or dip below
+// the real data - which is what was reading as "not smooth" before.
+function monotoneTangents(pts){
+  const n=pts.length;
+  const d=[];
+  for(let i=0;i<n-1;i++){
+    const dx=pts[i+1][0]-pts[i][0];
+    d.push(dx===0?0:(pts[i+1][1]-pts[i][1])/dx);
+  }
+  const m=new Array(n);
+  m[0]=d[0]||0;
+  m[n-1]=d[n-2]||0;
+  for(let i=1;i<n-1;i++){
+    if(d[i-1]===0||d[i]===0||(d[i-1]<0)!==(d[i]<0)) m[i]=0;
+    else m[i]=(d[i-1]+d[i])/2;
+  }
+  for(let i=0;i<n-1;i++){
+    if(d[i]===0){ m[i]=0; m[i+1]=0; continue; }
+    const a=m[i]/d[i], b=m[i+1]/d[i], s=a*a+b*b;
+    if(s>9){
+      const tau=3/Math.sqrt(s);
+      m[i]=tau*a*d[i];
+      m[i+1]=tau*b*d[i];
+    }
+  }
+  return m;
+}
+function monotonePath(pts){
+  if(!pts.length) return '';
+  if(pts.length<2) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  const m=monotoneTangents(pts);
+  let d=`M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for(let i=0;i<pts.length-1;i++){
+    const dx=(pts[i+1][0]-pts[i][0])/3;
+    const c1x=pts[i][0]+dx, c1y=pts[i][1]+m[i]*dx;
+    const c2x=pts[i+1][0]-dx, c2y=pts[i+1][1]-m[i+1]*dx;
+    d+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${pts[i+1][0].toFixed(1)},${pts[i+1][1].toFixed(1)}`;
+  }
+  return d;
+}
+function monotoneAreaPath(pts,baseY){
+  if(pts.length<1) return '';
+  const first=pts[0], last=pts[pts.length-1];
+  return `${monotonePath(pts)} L ${last[0].toFixed(1)},${baseY.toFixed(1)} L ${first[0].toFixed(1)},${baseY.toFixed(1)} Z`;
+}
+
+// Weekly Expense/Income, Monday-start buckets, single line chart with a
+// toggle between the two - rebuilt from a two-layer stacked area (CommBank
+// + Latitude) to a single clean line because stacking two accounts made
+// every spike read as two overlapping shapes instead of one trend. The
+// CommBank/Latitude split still exists, just moved into the tap-to-inspect
+// transaction table instead of the chart itself.
 // Purely a client-side aggregation + SVG render of whatever
 // loadSpendHistory() already fetched, so this is cheap to call from every
 // render() pass. No charting library: this app loads nothing but the
-// Firebase SDK, so the area chart is hand-built as plain SVG paths.
+// Firebase SDK, so the chart is hand-built as plain SVG paths.
 function renderSpendChart(){
   const box=document.getElementById('spendChart');
   if(!box) return;
+  const toggleBox=document.getElementById('spendToggle');
+  if(toggleBox){
+    toggleBox.innerHTML=`
+      <button class="${spendChartMode==='expense'?'active':''}" onclick="setSpendChartMode('expense')">&uarr; Expense</button>
+      <button class="${spendChartMode==='income'?'active':''}" onclick="setSpendChartMode('income')">&darr; Income</button>`;
+  }
   if(spendHistoryError){
     box.innerHTML='<div class="fnSub">Couldn\'t load spending history ('+escHtml(spendHistoryError)+').</div>';
     return;
@@ -2000,22 +2069,22 @@ function renderSpendChart(){
   // trackers/{uid}/transactions holds every PocketSmith-connected account,
   // including ones deliberately left out of the CommBank/Latitude split
   // (like a third "Spending (Up)" account) and any transfers between your
-  // own accounts, which aren't real spending. Only count transactions from
-  // accounts actually classified as CommBank or Latitude, the same split
-  // the rest of the dashboard uses.
+  // own accounts, which aren't real spending or income. Only count
+  // transactions from accounts actually classified as CommBank or
+  // Latitude, the same split the rest of the dashboard uses.
   const bankIds=new Set((bank && Array.isArray(bank.accounts)) ? bank.accounts.map(a=>a.id) : []);
   const latIds=new Set((latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.map(a=>a.id) : []);
   const weekStart=d=>{ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return iso(x); };
   const buckets={};
   spendHistory.forEach(t=>{
     const amt=Number(t.amount)||0;
-    if(amt>=0 || !t.date) return;
+    if(!t.date || !amt) return;
     if(isExcludedTxn(t)) return;
-    const isBank=bankIds.has(t.accountId), isLat=latIds.has(t.accountId);
-    if(!isBank && !isLat) return;
+    if(!bankIds.has(t.accountId) && !latIds.has(t.accountId)) return;
     const wk=weekStart(parseDate(t.date));
-    if(!buckets[wk]) buckets[wk]={bank:0,lat:0};
-    buckets[wk][isBank?'bank':'lat']+=Math.abs(amt);
+    if(!buckets[wk]) buckets[wk]={expense:0,income:0};
+    if(amt<0) buckets[wk].expense+=Math.abs(amt);
+    else buckets[wk].income+=amt;
   });
   // Most recent 12 weeks. How much history actually exists here depends on
   // how far back the Cloud Function pulls transactions from PocketSmith
@@ -2023,61 +2092,29 @@ function renderSpendChart(){
   // the display so it never grows unbounded as more accumulates over time.
   const weekKeys=Object.keys(buckets).sort().slice(-12);
   if(!weekKeys.length){
-    box.innerHTML='<div class="fnSub">No spending in the synced history yet.</div>';
+    box.innerHTML='<div class="fnSub">No spending or income in the synced history yet.</div>';
     return;
   }
-  const rows=weekKeys.map(wk=>({wk, bank:buckets[wk].bank, lat:buckets[wk].lat, total:buckets[wk].bank+buckets[wk].lat}));
-  const rawMax=Math.max(...rows.map(r=>r.total), 1);
+  const rows=weekKeys.map(wk=>({wk, expense:buckets[wk].expense, income:buckets[wk].income}));
+  const mode=spendChartMode;
+  const color=mode==='expense'?'var(--red)':'var(--green)';
+  const rawMax=Math.max(...rows.map(r=>r[mode]), 1);
 
-  // Round tick step to a "nice" 1/2/5 x 10^n number (same approach any
-  // charting library uses) instead of 3 arbitrary fractions of the max, so
-  // the axis reads like $0 / $1,000 / $2,000... rather than 3 odd amounts.
-  const tickCount=5;
-  const rawStep=rawMax/tickCount;
-  const mag=Math.pow(10,Math.floor(Math.log10(rawStep||1)));
-  const norm=rawStep/mag;
-  const step=(norm<1.5?1:norm<3?2:norm<7?5:10)*mag;
-  const ticks=[];
-  for(let v=0; v<=rawMax+step*0.001; v+=step) ticks.push(Math.round(v*100)/100);
-  const max=ticks[ticks.length-1];
-
-  const W=760, H=240, padL=64, padR=10, padT=16, padB=26;
+  const W=760, H=220, padL=16, padR=16, padT=38, padB=26;
   const plotW=W-padL-padR, plotH=H-padT-padB;
   const n=rows.length;
   const xAt=i=> n<=1 ? padL+plotW/2 : padL+(plotW*i/(n-1));
-  const yAt=v=> padT+plotH-(Math.max(0,v)/max*plotH);
+  const yAt=v=> padT+plotH-(Math.max(0,v)/(rawMax*1.15)*plotH);
+  const baseY=yAt(0);
 
-  // Smooth cubic-bezier spline through each set of points (a Catmull-Rom
-  // spline converted to bezier segments), instead of sharp straight-line
-  // joins between weeks - reads as an actual trend line rather than a
-  // jagged zig-zag.
-  const curveCmds=pts=>{
-    let d='';
-    for(let i=0;i<pts.length-1;i++){
-      const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
-      const c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
-      const c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
-      d+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
-    }
-    return d;
-  };
-  const smoothLine=pts=> pts.length<2 ? '' : `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`+curveCmds(pts);
-  const smoothArea=(topPts,botPts)=>{
-    const bot=botPts.slice().reverse();
-    return smoothLine(topPts)
-      + ` L ${bot[0][0].toFixed(1)},${bot[0][1].toFixed(1)}`
-      + curveCmds(bot) + ' Z';
-  };
-
-  const pt=(i,v)=>[xAt(i),yAt(v)];
-  const zeroPts=rows.map((r,i)=>pt(i,0));
-  const bankPts=rows.map((r,i)=>pt(i,r.bank));
-  const totalPts=rows.map((r,i)=>pt(i,r.total));
-
-  const gridLines=ticks.map(t=>`<line x1="${padL}" y1="${yAt(t).toFixed(1)}" x2="${W-padR}" y2="${yAt(t).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 4"/>`).join('');
-  const yLabels=ticks.map(t=>`<text x="${padL-10}" y="${(yAt(t)+4).toFixed(1)}" text-anchor="end" class="chartAxis">${money(t)}</text>`).join('');
+  const tickCount=3;
+  const gridLines=Array.from({length:tickCount},(_,i)=>{
+    const y=(padT+(plotH*i/(tickCount-1))).toFixed(1);
+    return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 4"/>`;
+  }).join('');
   const xLabels=rows.map((r,i)=>{
-    if(n>8 && i%2===1) return '';
+    const skip=n>10?(i%3!==0 && i!==n-1):(n>6 && i%2===1 && i!==n-1);
+    if(skip) return '';
     return `<text x="${xAt(i).toFixed(1)}" y="${H-6}" text-anchor="middle" class="chartAxis">${shortDate(parseDate(r.wk))}</text>`;
   }).join('');
 
@@ -2086,18 +2123,38 @@ function renderSpendChart(){
   // default. Every week is tappable, not just the peak, via an invisible
   // full-height hit zone per week - small dots alone are too fiddly to tap
   // accurately on a phone.
-  const peak=rows.slice().sort((a,b)=>b.total-a.total)[0];
+  const peak=rows.slice().sort((a,b)=>b[mode]-a[mode])[0];
   const active=(selectedSpendWeek && rows.find(r=>r.wk===selectedSpendWeek)) || peak;
   const activeIdx=rows.findIndex(r=>r.wk===active.wk);
 
+  const linePts=rows.map((r,i)=>[xAt(i),yAt(r[mode])]);
+
   const bandStep=n>1 ? xAt(1)-xAt(0) : plotW;
   const hitZones=rows.map((r,i)=>
-    `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="${padT}" width="${bandStep.toFixed(1)}" height="${plotH}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
+    `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="0" width="${bandStep.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
   ).join('');
 
-  const guideLine=`<line x1="${xAt(activeIdx).toFixed(1)}" y1="${padT}" x2="${xAt(activeIdx).toFixed(1)}" y2="${padT+plotH}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity=".5"/>`;
-  const activeDot=`<circle cx="${xAt(activeIdx).toFixed(1)}" cy="${yAt(active.total).toFixed(1)}" r="7" fill="#8e35b8" fill-opacity=".18"/>
-    <circle cx="${xAt(activeIdx).toFixed(1)}" cy="${yAt(active.total).toFixed(1)}" r="4" fill="var(--card)" stroke="#8e35b8" stroke-width="2.25"/>`;
+  const activeDot=`<circle cx="${xAt(activeIdx).toFixed(1)}" cy="${yAt(active[mode]).toFixed(1)}" r="7" fill="${color}" fill-opacity=".18"/>
+    <circle cx="${xAt(activeIdx).toFixed(1)}" cy="${yAt(active[mode]).toFixed(1)}" r="4" fill="var(--card)" stroke="${color}" stroke-width="2.25"/>`;
+
+  // Sparse floating value labels, not a full $ axis - a pill for the
+  // highest point and one for the active point (deduped if they're the
+  // same point), positioned above the line and clamped inside the plot so
+  // they never clip off the edge of the chart.
+  const pillLabel=(i,v,emphasis)=>{
+    if(v<=0) return '';
+    const text=money(v);
+    const w=text.length*6.4+16;
+    let x=xAt(i); const y=yAt(v)-16;
+    x=Math.min(Math.max(x,padL+w/2),W-padR-w/2);
+    return `<g>
+      <rect x="${(x-w/2).toFixed(1)}" y="${(y-13).toFixed(1)}" width="${w.toFixed(1)}" height="20" rx="10" fill="var(--card)" stroke="var(--border)"/>
+      <text x="${x.toFixed(1)}" y="${(y+1).toFixed(1)}" text-anchor="middle" class="chartLabel" fill="${emphasis?color:'var(--text)'}">${text}</text>
+    </g>`;
+  };
+  const peakIdx=rows.findIndex(r=>r.wk===peak.wk);
+  let labels=pillLabel(peakIdx,peak[mode],true);
+  if(active.wk!==peak.wk) labels+=pillLabel(activeIdx,active[mode],false);
 
   // Transaction breakdown for whichever week is active, collapsed unless
   // you've actually tapped a point. Lets a spike be checked and, if it's a
@@ -2105,18 +2162,21 @@ function renderSpendChart(){
   // transaction id added to EXCLUDED_TXN_IDS above without needing to
   // re-add debug code each time.
   let detail='';
-  if(active && active.total>0){
+  if(active && active[mode]>0){
     const wkEnd=new Date(parseDate(active.wk)); wkEnd.setDate(wkEnd.getDate()+6);
     const txns=spendHistory
-      .filter(t=>Number(t.amount)<0 && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && !isExcludedTxn(t) && t.date>=active.wk && t.date<=iso(wkEnd))
-      .sort((a,b)=>a.amount-b.amount);
+      .filter(t=>{
+        const amt=Number(t.amount)||0;
+        return (mode==='expense'?amt<0:amt>0) && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && !isExcludedTxn(t) && t.date>=active.wk && t.date<=iso(wkEnd);
+      })
+      .sort((a,b)=>mode==='expense'?a.amount-b.amount:b.amount-a.amount);
     const isPeak=active.wk===peak.wk;
     detail=`
     <details class="fnSettings" style="margin-top:14px"${selectedSpendWeek?' open':''}>
-      <summary>Week of ${shortDate(parseDate(active.wk))} · ${money(active.total)}${isPeak?' · highest week':''}</summary>
+      <summary>Week of ${shortDate(parseDate(active.wk))} · ${money(active[mode])}${isPeak?' · highest week':''}</summary>
       <table class="table" style="margin-top:10px">
         <thead><tr><th>Date</th><th class="hideMobile">Account</th><th>Payee</th><th>Amount</th></tr></thead>
-        <tbody>${txns.length?txns.map(t=>`<tr><td>${niceDate(parseDate(t.date))}</td><td class="hideMobile">${bankIds.has(t.accountId)?'CommBank':'Latitude'}</td><td>${escHtml(t.payee||'(no payee)')}<span style="display:block;font-size:11px;color:var(--muted)">id ${escHtml(String(t.id))}</span></td><td>${money(t.amount)}</td></tr>`).join(''):'<tr><td colspan="4">No transactions counted this week (everything landed outside CommBank/Latitude or was excluded).</td></tr>'}</tbody>
+        <tbody>${txns.length?txns.map(t=>`<tr><td>${niceDate(parseDate(t.date))}</td><td class="hideMobile">${bankIds.has(t.accountId)?'CommBank':'Latitude'}</td><td>${escHtml(t.payee||'(no payee)')}<span style="display:block;font-size:11px;color:var(--muted)">id ${escHtml(String(t.id))}</span></td><td>${money(t.amount)}</td></tr>`).join(''):`<tr><td colspan="4">No ${mode==='expense'?'spending':'income'} counted this week (everything landed outside CommBank/Latitude or was excluded).</td></tr>`}</tbody>
       </table>
     </details>`;
   }
@@ -2124,30 +2184,25 @@ function renderSpendChart(){
   box.innerHTML=`
     <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
       <defs>
-        <linearGradient id="spendGradBank" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#2f77d0" stop-opacity=".38"/>
-          <stop offset="100%" stop-color="#2f77d0" stop-opacity="0"/>
-        </linearGradient>
-        <linearGradient id="spendGradLat" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#8e35b8" stop-opacity=".38"/>
-          <stop offset="100%" stop-color="#8e35b8" stop-opacity="0"/>
+        <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity=".32"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
         </linearGradient>
       </defs>
       ${gridLines}
-      <path d="${smoothArea(bankPts,zeroPts)}" fill="url(#spendGradBank)" stroke="#2f77d0" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>
-      <path d="${smoothArea(totalPts,bankPts)}" fill="url(#spendGradLat)" stroke="#8e35b8" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>
-      ${guideLine}
+      <path d="${monotoneAreaPath(linePts,baseY)}" fill="url(#spendGrad)"/>
+      <path d="${monotonePath(linePts)}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${activeDot}
-      ${yLabels}
+      ${labels}
       ${xLabels}
       ${hitZones}
     </svg>
     <div class="chartLegend">
-      <span><i class="dot" style="background:#2f77d0"></i>CommBank <b>${money(active.bank)}</b></span>
-      <span><i class="dot" style="background:#8e35b8"></i>Latitude <b>${money(active.lat)}</b></span>
+      <span class="chartBig">${money(active[mode])}</span>
+      <span class="chartSub">Week of ${shortDate(parseDate(active.wk))}${active.wk===peak.wk?' · highest week':''}</span>
       <span class="chartHint">Tap a point to inspect that week</span>
     </div>
-    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>
+    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of ${mode==='expense'?'spending':'income'}, pulled from PocketSmith.</div>
     ${detail}`;
 }
 
