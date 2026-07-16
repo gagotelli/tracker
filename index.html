@@ -163,6 +163,9 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .fnGroup{margin-top:18px}
 .fnGroupHead{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:600;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .fnGroupHead b{font-family:var(--mono);color:var(--muted);font-weight:400}
+.pillToggle{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
+.pillToggle button{border:none;background:transparent;color:var(--muted);font-family:var(--mono);font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;letter-spacing:.02em;transition:background .15s,color .15s}
+.pillToggle button.active{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
 .fnDue{font-size:12px;color:var(--muted)}
 .fnDue.soon{color:var(--red);font-weight:600}
 .fnExtra{font-size:11px;color:var(--muted);display:block}
@@ -683,6 +686,7 @@ const firebaseConfig = {
               </select>
             </label>
             <label>Extra this fortnight<input id="newCardExtra" type="number" step="0.01"><span class="fnHint">Optional debt attack, on top of the repayment above. Shown as a goal, not deducted from Safe to spend.</span></label>
+            <label>Interest rate % (optional)<input id="newCardRate" type="number" step="0.01"><span class="fnHint">Only used to work out a suggested payoff order under Total Debt.</span></label>
             <label>Colour
               <select id="newCardColor">
                 <option value="#2f77d0">Blue</option>
@@ -731,6 +735,7 @@ const firebaseConfig = {
               </select>
             </label>
             <label>Term Months<input id="newLoanTermMonths" type="number"></label>
+            <label>Interest rate % (optional)<input id="newLoanRate" type="number" step="0.01"><span class="fnHint">Only used to work out a suggested payoff order under Total Debt.</span></label>
             <label>Colour
               <select id="newLoanColor">
                 <option value="#87c64a">Green</option>
@@ -1444,6 +1449,14 @@ function renderFortnight(){
   }
 }
 
+// Suggested payoff order under Total Debt: avalanche (highest interest
+// rate first, the mathematically cheapest order) needs a rate on at
+// least one debt to mean anything, so it's only offered once one is set;
+// snowball (smallest balance first, no rate data required) is always
+// available and is the default until then.
+let payoffStrategy='snowball';
+function setPayoffStrategy(s){ if(s===payoffStrategy) return; payoffStrategy=s; render(); }
+
 function render(){
   try{
     renderBank();
@@ -1647,7 +1660,44 @@ function render(){
           <div><div class="label">Repayments</div><b>${money(repay)} <span class="fnDue">per fortnight</span></b></div>
           <div><div class="label">Debt free (est.)</div><b>${clear?niceDate(clear):'Set repayments'}</b></div>
         </div>
-        <div class="fnSub" style="margin-top:10px">Estimate assumes repayments stay the same and ignores future interest.</div>`;
+        <div class="fnSub" style="margin-top:10px">Estimate assumes repayments stay the same and ignores future interest.</div>
+
+        ${(()=>{
+          // Suggested payoff order: avalanche (highest rate first) is the
+          // mathematically cheapest order, but only means anything once at
+          // least one debt actually has a rate entered - otherwise every
+          // debt ties at 0% and the "order" would just be arbitrary.
+          const rateFor=d=>{
+            const loan=(data.loans||[]).find(l=>normalise(l.name)===normalise(d.name));
+            if(loan) return Number(loan.rate)||0;
+            const account=data.accounts.find(a=>normalise(a.name)===normalise(d.name)||paymentMatches(d.name,a.name));
+            return account?Number(account.rate)||0:0;
+          };
+          const hasAnyRate=debts.some(d=>rateFor(d)>0);
+          const strategy=hasAnyRate?payoffStrategy:'snowball';
+          const ordered=debts.map(d=>({...d,rate:rateFor(d)})).sort((a,b)=>
+            strategy==='avalanche' ? (b.rate-a.rate || b.amount-a.amount) : (a.amount-b.amount)
+          );
+          return `
+        <div class="fnGroup">
+          <div class="fnGroupHead">
+            <span>Suggested payoff order</span>
+            ${hasAnyRate?`<div class="pillToggle">
+              <button class="${strategy==='avalanche'?'active':''}" onclick="setPayoffStrategy('avalanche')">Avalanche</button>
+              <button class="${strategy==='snowball'?'active':''}" onclick="setPayoffStrategy('snowball')">Snowball</button>
+            </div>`:''}
+          </div>
+          <table class="table" style="margin-top:10px">
+            <thead><tr><th>#</th><th>Name</th><th class="hideMobile">Rate</th><th>Balance</th></tr></thead>
+            <tbody>${ordered.map((d,i)=>`<tr><td>${i+1}</td><td>${escHtml(d.name)}</td><td class="hideMobile">${d.rate>0?d.rate.toFixed(2)+'%':'—'}</td><td><b>${money(d.amount)}</b></td></tr>`).join('')}</tbody>
+          </table>
+          <p class="fnSub" style="margin-top:8px">${hasAnyRate
+            ? (strategy==='avalanche'
+              ? 'Avalanche: highest interest rate first &mdash; mathematically the least interest paid overall.'
+              : 'Snowball: smallest balance first &mdash; clears an account fastest for momentum, not the cheapest order.')
+            : 'Showing snowball order (smallest balance first). Add an interest rate under Cards or Loans to unlock avalanche ordering.'}</p>
+        </div>`;
+        })()}`;
     })();
 
     if(document.getElementById('profileCardsTable')){
@@ -1757,6 +1807,7 @@ function fillCardForm(v){
   newCardDate.value=v.date||'';
   newCardRepeat.value=v.repeat||'Fortnightly';
   newCardExtra.value=v.extra||'';
+  newCardRate.value=v.rate||'';
   newCardColor.value=v.color||defaultCardColor(v.name);
 }
 
@@ -1768,7 +1819,7 @@ function editCardItem(i){
   fillCardForm({
     name:a.name, balance:a.balance, limit:a.limit,
     repayment: bill?bill.amount:a.min, date: bill?bill.date:'', repeat: bill?bill.repeat:'Fortnightly',
-    extra:a.extra, color:a.color
+    extra:a.extra, rate:a.rate, color:a.color
   });
   document.getElementById('addCardTitle').textContent='EDIT '+a.name.toUpperCase();
   document.getElementById('addCardSave').textContent='Save changes';
@@ -1779,7 +1830,7 @@ function editCardItem(i){
 
 function cancelEditCard(){
   editingCardIndex=null;
-  newCardName.value=''; newCardBalance.value=''; newCardLimit.value=''; newCardRepayment.value=''; newCardDate.value=''; newCardExtra.value='';
+  newCardName.value=''; newCardBalance.value=''; newCardLimit.value=''; newCardRepayment.value=''; newCardDate.value=''; newCardExtra.value=''; newCardRate.value='';
   document.getElementById('addCardTitle').textContent='ADD A CARD';
   document.getElementById('addCardSave').textContent='Add card';
   document.getElementById('addCardCancel').hidden=true;
@@ -1793,6 +1844,7 @@ function saveCardItem(){
   const date=newCardDate.value||iso(today());
   const repeat=newCardRepeat.value;
   const extra=Math.max(0,+newCardExtra.value||0);
+  const rate=Math.max(0,+newCardRate.value||0);
   const color=newCardColor.value||defaultCardColor(name);
 
   if(editingCardIndex!=null && data.accounts[editingCardIndex]){
@@ -1800,7 +1852,7 @@ function saveCardItem(){
     const account=data.accounts[editingCardIndex];
     account.name=name; account.balance=balance; account.min=repayment;
     account.due=niceDate(parseDate(date)); account.limit=limit||balance;
-    account.available=Math.max(0,(limit||balance)-balance); account.color=color; account.extra=extra;
+    account.available=Math.max(0,(limit||balance)-balance); account.color=color; account.extra=extra; account.rate=rate;
 
     const bill=data.bills.find(b=>paymentMatches(b.description,oldName));
     if(bill){ bill.description=name; bill.date=date; bill.amount=repayment; bill.repeat=repeat; }
@@ -1814,7 +1866,7 @@ function saveCardItem(){
     return;
   }
 
-  data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),color,extra});
+  data.accounts.push({name,balance,min:repayment,due:niceDate(parseDate(date)),limit:limit||balance,available:Math.max(0,(limit||balance)-balance),color,extra,rate});
   data.bills.push({description:name,date,amount:repayment,repeat});
 
   cancelEditCard();
@@ -1844,6 +1896,7 @@ function fillLoanForm(v){
   newLoanPayment.value=v.paymentAmount||0;
   newLoanRepeat.value=v.repeat||'Fortnightly';
   newLoanTermMonths.value=v.termMonths||60;
+  newLoanRate.value=v.rate||'';
   newLoanColor.value=v.color||'#87c64a';
 }
 
@@ -1861,7 +1914,7 @@ function editLoanItem(i){
 
 function cancelEditLoan(){
   editingLoanIndex=null;
-  newLoanName.value=''; newLoanTotal.value=''; newLoanPaid.value=''; newLoanStartDate.value=''; newLoanPayment.value=''; newLoanTermMonths.value='';
+  newLoanName.value=''; newLoanTotal.value=''; newLoanPaid.value=''; newLoanStartDate.value=''; newLoanPayment.value=''; newLoanTermMonths.value=''; newLoanRate.value='';
   document.getElementById('addLoanTitle').textContent='ADD A LOAN';
   document.getElementById('addLoanSave').textContent='Add loan';
   document.getElementById('addLoanCancel').hidden=true;
@@ -1876,11 +1929,12 @@ function saveLoanItem(){
   const paymentAmount=+newLoanPayment.value||0;
   const repeat=newLoanRepeat.value;
   const termMonths=+newLoanTermMonths.value||60;
+  const rate=Math.max(0,+newLoanRate.value||0);
   const color=newLoanColor.value||'#87c64a';
 
   if(editingLoanIndex!=null && data.loans[editingLoanIndex]){
     const oldName=data.loans[editingLoanIndex].name;
-    data.loans[editingLoanIndex]={name,type,total,paid,startDate,paymentAmount,repeat,termMonths,color};
+    data.loans[editingLoanIndex]={name,type,total,paid,startDate,paymentAmount,repeat,termMonths,rate,color};
 
     // Only the amount/cadence are kept in sync on the linked bill, never its
     // date: the bill's date is the rolling next-due date (advanced by
@@ -1900,7 +1954,7 @@ function saveLoanItem(){
     return;
   }
 
-  data.loans.push({name,type,total,paid,startDate,paymentAmount,repeat,termMonths,color});
+  data.loans.push({name,type,total,paid,startDate,paymentAmount,repeat,termMonths,rate,color});
   data.bills.push({description:name,date:startDate,amount:paymentAmount,repeat});
 
   cancelEditLoan();
