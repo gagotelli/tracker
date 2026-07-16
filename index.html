@@ -668,7 +668,11 @@ const firebaseConfig = {
           <div class="summaryRow"><span class="summaryLabel">Due next 14 days</span><b class="summaryFig" id="due14"></b></div>
           <div class="summaryRow"><span class="summaryLabel">Due next 30 days</span><b class="summaryFig" id="due30"></b></div>
         </div>
-        <div class="actions"><button class="btn" onclick="openEntry()">Add payment</button></div>
+        <div class="actions">
+          <button class="btn" onclick="openEntry()">Add payment</button>
+          <button class="btn secondary" id="billAlertTestBtn" type="button">Send test alert</button>
+        </div>
+        <div id="billAlertMsg" class="fnSub" style="display:none;margin:-6px 0 14px"></div>
         <table class="table">
           <thead><tr><th>Description</th><th>Next Date</th><th class="hideMobile">Days</th><th>Amount</th><th class="hideMobile">Repeat</th><th class="hideMobile">Status</th><th></th></tr></thead>
           <tbody id="upcomingTable"></tbody>
@@ -2801,6 +2805,39 @@ function wireFeedSyncButton(btnId, msgId, fnName){
   });
 }
 
+// Reports the real outcome (sent, or why not) rather than just success/fail,
+// since "nothing due soon" is an expected, non-error result worth showing.
+function wireBillAlertTestButton(){
+  const btn=document.getElementById('billAlertTestBtn');
+  const msg=document.getElementById('billAlertMsg');
+  if(!btn) return;
+  btn.addEventListener('click', async ()=>{
+    if(!CLOUD || !window._fns || !cloudUser){
+      if(msg){ msg.style.display='block'; msg.textContent='Sign in first.'; }
+      return;
+    }
+    const label=btn.textContent;
+    btn.disabled=true; btn.textContent='Sending';
+    try{
+      const res=await window._fns.httpsCallable('checkBillAlertsNow')();
+      const r=res.data||{};
+      if(msg){
+        msg.style.display='block';
+        msg.textContent = r.sent
+          ? `Sent: ${money(r.dueTotal)} due soon, only ${money(r.cash)} available.`
+          : r.reason==='covered'
+            ? `No alert needed — ${money(r.dueTotal||0)} due soon is covered by ${money(r.cash||0)} available.`
+            : `No alert sent (${r.reason||'unknown reason'}).`;
+      }
+    }catch(e){
+      console.error('checkBillAlertsNow failed', e);
+      if(msg){ msg.style.display='block'; msg.textContent='Test failed: '+(e.message||e.code||'unknown error'); }
+    }finally{
+      btn.disabled=false; btn.textContent=label;
+    }
+  });
+}
+
 function wireBankSync(){
   wireFeedSyncButton('bkSyncBtn','bkMsg','syncBankNow');
   wireFeedSyncButton('ltSyncBtn','ltMsg','syncLatitudeNow');
@@ -2808,6 +2845,7 @@ function wireBankSync(){
 
 wireAuthButtons();
 wireBankSync();
+wireBillAlertTestButton();
 initCloud();
 
 </script>

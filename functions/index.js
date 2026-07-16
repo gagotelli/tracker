@@ -26,6 +26,7 @@ const db = admin.firestore();
 
 const PS_KEY = defineSecret("POCKETSMITH_KEY");
 const OWNER_UID = defineSecret("OWNER_UID");
+const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 
 const REGION = "australia-southeast1";
 const API = "https://api.pocketsmith.com/v2";
@@ -237,5 +238,132 @@ exports.syncLatitudeNow = onCall(
       throw new HttpsError("permission-denied", "Not your tracker.");
     }
     return await syncUser(request.auth.uid, PS_KEY.value());
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Bill alerts: warns by email when a bill is due soon and the Personal/Bills
+// balance won't cover it. Deliberately its own small re-implementation of
+// index.html's bill-recurrence and Safe-to-spend-cash logic rather than a
+// shared module - this runs server-side with no access to the browser's
+// code, and the alternative (loading index.html's <script> into a Function)
+// is worse than a few duplicated lines kept in sync by hand. If the client's
+// SAFE_CASH_MATCH regex or addCycle() ever change, mirror the change here.
+// ---------------------------------------------------------------------------
+
+const SAFE_CASH_MATCH = /\bpersonal\b|\bbills\b/i;
+const ALERT_WINDOW_DAYS = 3;
+
+function addCycle(d, repeat) {
+  const x = new Date(d);
+  if (repeat === "Weekly") x.setDate(x.getDate() + 7);
+  else if (repeat === "Fortnightly") x.setDate(x.getDate() + 14);
+  else if (repeat === "Yearly") x.setFullYear(x.getFullYear() + 1);
+  else x.setMonth(x.getMonth() + 1);
+  return x;
+}
+
+function nextDueDate(bill, from) {
+  let d = new Date(bill.date + "T00:00:00");
+  let guard = 0;
+  while (d < from && guard < 400) {
+    d = addCycle(d, bill.repeat);
+    guard++;
+  }
+  return d;
+}
+
+async function checkBillAlerts(uid, resendKey, force) {
+  const snap = await db.doc(`trackers/${uid}`).get();
+  if (!snap.exists) return { sent: false, reason: "no tracker doc" };
+  const trackerData = snap.data();
+  const store = trackerData.store;
+  const profile = store && store.profiles && store.profiles[store.active];
+  if (!profile) return { sent: false, reason: "no active profile" };
+
+  const bills = profile.bills || [];
+  const bankAccounts = (trackerData.bank && trackerData.bank.accounts) || [];
+  const cash = bankAccounts
+    .filter((a) => SAFE_CASH_MATCH.test(a.name || ""))
+    .reduce((s, a) => s + Math.max(0, Number(a.balance) || 0), 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const windowEnd = new Date(today);
+  windowEnd.setDate(windowEnd.getDate() + ALERT_WINDOW_DAYS);
+
+  const dueSoon = bills
+    .map((b) => ({ ...b, next: nextDueDate(b, today) }))
+    .filter((b) => b.next <= windowEnd)
+    .sort((a, b) => a.next - b.next);
+  const dueTotal = dueSoon.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+
+  if (!dueSoon.length || dueTotal <= cash) {
+    return { sent: false, reason: "covered", dueTotal: round2(dueTotal), cash: round2(cash) };
+  }
+
+  // One email per calendar day even though the schedule could in principle
+  // fire more than once while the shortfall persists - force skips this,
+  // for the manual "send test alert" button.
+  const alertDoc = db.doc(`trackers/${uid}/meta/billAlerts`);
+  const todayIso = iso(today);
+  if (!force) {
+    const alertSnap = await alertDoc.get();
+    if (alertSnap.exists && alertSnap.data().lastSent === todayIso) {
+      return { sent: false, reason: "already sent today" };
+    }
+  }
+
+  const lines = dueSoon
+    .map((b) => `- ${b.description}: $${(Number(b.amount) || 0).toFixed(2)}, due ${iso(b.next)}`)
+    .join("\n");
+  const text =
+    `Bills due in the next ${ALERT_WINDOW_DAYS} days total $${dueTotal.toFixed(2)}, ` +
+    `but your Personal/Bills accounts only have $${cash.toFixed(2)} available.\n\n${lines}`;
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: "Finance Tracker <onboarding@resend.dev>",
+      to: ["gagotelli@gmail.com"],
+      subject: `Bill alert: $${dueTotal.toFixed(2)} due soon, only $${cash.toFixed(2)} available`,
+      text,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Resend ${res.status}: ${await res.text()}`);
+  }
+
+  await alertDoc.set({ lastSent: todayIso }, { merge: true });
+  return { sent: true, dueTotal: round2(dueTotal), cash: round2(cash) };
+}
+
+exports.checkBillAlertsScheduled = onSchedule(
+  {
+    schedule: "every day 07:00",
+    timeZone: "Australia/Sydney",
+    region: REGION,
+    secrets: [OWNER_UID, RESEND_API_KEY],
+  },
+  async () => {
+    const r = await checkBillAlerts(OWNER_UID.value(), RESEND_API_KEY.value(), false);
+    console.log("bill alert check", r);
+  }
+);
+
+// Manual trigger for the "Send test alert" button, so the email pipeline
+// can be checked without waiting for tomorrow's 7am run. Bypasses the
+// once-a-day dedup (force:true) but still only actually sends if a bill
+// really is due soon and cash really doesn't cover it - it tests the real
+// condition, not a fake one.
+exports.checkBillAlertsNow = onCall(
+  { region: REGION, secrets: [OWNER_UID, RESEND_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Sign in first.");
+    if (request.auth.uid !== OWNER_UID.value()) {
+      throw new HttpsError("permission-denied", "Not your tracker.");
+    }
+    return await checkBillAlerts(request.auth.uid, RESEND_API_KEY.value(), true);
   }
 );
