@@ -93,9 +93,10 @@ h1{font-size:19px;margin:0;font-weight:800;letter-spacing:-.01em}
 .table th,.table td{padding:13px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;font-variant-numeric:tabular-nums}
 .table th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
 .table tbody tr:last-child td{border-bottom:0}
-.summary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
-.summary div{background:var(--soft);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center}
-.summary strong{display:block;font-size:20px;color:var(--text);margin-top:8px;font-variant-numeric:tabular-nums}
+.summary{margin-bottom:18px;border-top:1px solid var(--border)}
+.summaryRow{display:flex;justify-content:space-between;align-items:baseline;padding:14px 2px;border-bottom:1px solid var(--border)}
+.summaryLabel{font-size:14px;color:var(--text)}
+.summaryFig{font-family:var(--mono);font-weight:700;font-size:20px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .chartBox{height:230px;position:relative}
 canvas{width:100%;height:100%;display:block}
 .legend-row{display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding:11px 0;gap:8px}
@@ -658,7 +659,10 @@ const firebaseConfig = {
     <div class="grid">
       <div class="card span12">
         <h2 class="section-title">UPCOMING PAYMENTS</h2>
-        <div class="summary"><div>Due next 14 days<strong id="due14"></strong></div><div>Due next 30 days<strong id="due30"></strong></div></div>
+        <div class="summary">
+          <div class="summaryRow"><span class="summaryLabel">Due next 14 days</span><b class="summaryFig" id="due14"></b></div>
+          <div class="summaryRow"><span class="summaryLabel">Due next 30 days</span><b class="summaryFig" id="due30"></b></div>
+        </div>
         <div class="actions"><button class="btn" onclick="openEntry()">Add payment</button></div>
         <table class="table">
           <thead><tr><th>Description</th><th>Next Date</th><th class="hideMobile">Days</th><th>Amount</th><th class="hideMobile">Repeat</th><th class="hideMobile">Status</th><th></th></tr></thead>
