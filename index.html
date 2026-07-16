@@ -2077,6 +2077,27 @@ function renderSpendChart(){
     `<circle cx="${xAt(i).toFixed(1)}" cy="${yAt(r.total).toFixed(1)}" r="3" fill="var(--card)" stroke="#8e35b8" stroke-width="1.75"><title>${shortDate(parseDate(r.wk))}: ${money(r.total)} total (${money(r.bank)} CommBank, ${money(r.lat)} Latitude)</title></circle>`
   ).join('');
 
+  // Transaction breakdown for the single highest week, collapsed by default.
+  // Lets a spike be checked and, if it's a sync artifact or an internal
+  // transfer rather than real spending, its transaction id added to
+  // EXCLUDED_TXN_IDS above without needing to re-add debug code each time.
+  let peakDetail='';
+  const peak=rows.slice().sort((a,b)=>b.total-a.total)[0];
+  if(peak && peak.total>0){
+    const peakEnd=new Date(parseDate(peak.wk)); peakEnd.setDate(peakEnd.getDate()+6);
+    const txns=spendHistory
+      .filter(t=>Number(t.amount)<0 && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && !EXCLUDED_TXN_IDS.has(t.id) && t.date>=peak.wk && t.date<=iso(peakEnd))
+      .sort((a,b)=>a.amount-b.amount);
+    peakDetail=`
+    <details class="fnSettings" style="margin-top:14px">
+      <summary>Transactions for week of ${shortDate(parseDate(peak.wk))} (highest week, ${money(peak.total)})</summary>
+      <table class="table" style="margin-top:10px">
+        <thead><tr><th>Date</th><th class="hideMobile">Account</th><th>Payee</th><th>Amount</th></tr></thead>
+        <tbody>${txns.map(t=>`<tr><td>${niceDate(parseDate(t.date))}</td><td class="hideMobile">${bankIds.has(t.accountId)?'CommBank':'Latitude'}</td><td>${escHtml(t.payee||'(no payee)')}<span style="display:block;font-size:11px;color:var(--muted)">id ${escHtml(String(t.id))}</span></td><td>${money(t.amount)}</td></tr>`).join('')}</tbody>
+      </table>
+    </details>`;
+  }
+
   box.innerHTML=`
     <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
       <defs>
@@ -2100,7 +2121,8 @@ function renderSpendChart(){
       <span><i class="dot" style="background:#2f77d0"></i>CommBank</span>
       <span><i class="dot" style="background:#8e35b8"></i>Latitude</span>
     </div>
-    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>`;
+    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of spending, from the last 35 days pulled from PocketSmith.</div>
+    ${peakDetail}`;
 }
 
 function cloudConfigured(){
