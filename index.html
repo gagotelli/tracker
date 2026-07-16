@@ -197,15 +197,12 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .spendSvg{width:100%;height:auto;display:block;overflow:visible}
 .chartAxis{font-family:var(--mono);font-size:10px;fill:var(--muted)}
 .chartLabel{font-family:var(--mono);font-size:11px;font-weight:700}
-.chartHead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px}
-.chartToggle{display:inline-flex;background:var(--soft);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
-.chartToggle button{border:none;background:transparent;color:var(--muted);font-family:var(--mono);font-size:12px;font-weight:700;padding:6px 14px;border-radius:999px;cursor:pointer;letter-spacing:.02em;transition:background .15s,color .15s}
-.chartToggle button.active{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
-.chartLegend{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-top:14px}
-.chartBig{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--text)}
+.chartLegend{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 10px;margin-top:16px}
+.chartStat{display:flex;align-items:baseline;gap:7px;padding-right:18px}
+.chartBig{font-family:var(--mono);font-size:19px;font-weight:800}
 .chartSub{font-size:12px;color:var(--muted)}
 .chartHint{margin-left:auto;font-size:11px;letter-spacing:.02em;color:var(--muted)}
-@media(max-width:520px){.chartHint{margin-left:0;flex-basis:100%}}
+@media(max-width:520px){.chartHint{margin-left:0;flex-basis:100%;margin-top:6px}}
 
 /* ===== THIS FORTNIGHT: mobile fit =====
    These tables are narrow by design and must never trigger the card's
@@ -558,10 +555,7 @@ const firebaseConfig = {
 
     <div class="grid" style="margin-bottom:16px">
       <div class="card span12">
-        <div class="chartHead">
-          <h2 class="section-title">SPENDING BY WEEK</h2>
-          <div class="chartToggle" id="spendToggle"></div>
-        </div>
+        <h2 class="section-title">CASH FLOW BY WEEK</h2>
         <div id="spendChart"><div class="fnSub">Loading spending history…</div></div>
       </div>
     </div>
@@ -1939,9 +1933,7 @@ function autoSyncBank(){
 let spendHistory=null;
 let spendHistoryError=null;
 let selectedSpendWeek=null; // null = defaults to the highest week
-let spendChartMode='expense'; // 'expense' | 'income'
 function selectSpendWeek(wk){ selectedSpendWeek=wk; renderSpendChart(); }
-function setSpendChartMode(m){ if(m===spendChartMode) return; spendChartMode=m; renderSpendChart(); }
 function loadSpendHistory(){
   if(!window._db || !cloudUser){
     spendHistoryError='Not signed in yet.';
@@ -2038,12 +2030,13 @@ function monotoneAreaPath(pts,baseY){
   return `${monotonePath(pts)} L ${last[0].toFixed(1)},${baseY.toFixed(1)} L ${first[0].toFixed(1)},${baseY.toFixed(1)} Z`;
 }
 
-// Weekly Expense/Income, Monday-start buckets, single line chart with a
-// toggle between the two - rebuilt from a two-layer stacked area (CommBank
-// + Latitude) to a single clean line because stacking two accounts made
-// every spike read as two overlapping shapes instead of one trend. The
-// CommBank/Latitude split still exists, just moved into the tap-to-inspect
-// transaction table instead of the chart itself.
+// Weekly cash flow, Monday-start buckets: one merged chart instead of a
+// toggle between two separate ones. Income is plotted upward from a shared
+// zero baseline, expense mirrored downward from the same baseline - a
+// diverging/butterfly chart, the same idea Copilot and Monarch use for
+// income-vs-spending trend views, just hand-built in SVG. It reads as one
+// picture of the week (both lines share an x-axis and a scale) instead of
+// two separate charts you have to flip between to compare.
 // Purely a client-side aggregation + SVG render of whatever
 // loadSpendHistory() already fetched, so this is cheap to call from every
 // render() pass. No charting library: this app loads nothing but the
@@ -2051,12 +2044,6 @@ function monotoneAreaPath(pts,baseY){
 function renderSpendChart(){
   const box=document.getElementById('spendChart');
   if(!box) return;
-  const toggleBox=document.getElementById('spendToggle');
-  if(toggleBox){
-    toggleBox.innerHTML=`
-      <button class="${spendChartMode==='expense'?'active':''}" onclick="setSpendChartMode('expense')">&uarr; Expense</button>
-      <button class="${spendChartMode==='income'?'active':''}" onclick="setSpendChartMode('income')">&darr; Income</button>`;
-  }
   if(spendHistoryError){
     box.innerHTML='<div class="fnSub">Couldn\'t load spending history ('+escHtml(spendHistoryError)+').</div>';
     return;
@@ -2099,23 +2086,19 @@ function renderSpendChart(){
     box.innerHTML='<div class="fnSub">No spending or income in the synced history yet.</div>';
     return;
   }
-  const rows=weekKeys.map(wk=>({wk, expense:buckets[wk].expense, income:buckets[wk].income}));
-  const mode=spendChartMode;
-  const color=mode==='expense'?'var(--red)':'var(--green)';
-  const rawMax=Math.max(...rows.map(r=>r[mode]), 1);
+  const rows=weekKeys.map(wk=>({wk, expense:buckets[wk].expense, income:buckets[wk].income, net:buckets[wk].income-buckets[wk].expense}));
+  const rawMax=Math.max(...rows.map(r=>Math.max(r.expense,r.income)), 1);
 
-  const W=760, H=220, padL=16, padR=16, padT=38, padB=26;
+  const W=760, H=280, padL=16, padR=16, padT=34, padB=46;
   const plotW=W-padL-padR, plotH=H-padT-padB;
   const n=rows.length;
   const xAt=i=> n<=1 ? padL+plotW/2 : padL+(plotW*i/(n-1));
-  const yAt=v=> padT+plotH-(Math.max(0,v)/(rawMax*1.15)*plotH);
-  const baseY=yAt(0);
+  const baseY=padT+plotH/2;
+  const halfH=plotH/2;
+  const scale=rawMax*1.2;
+  const yIncome=v=> baseY-(Math.max(0,v)/scale*halfH);
+  const yExpense=v=> baseY+(Math.max(0,v)/scale*halfH);
 
-  const tickCount=3;
-  const gridLines=Array.from({length:tickCount},(_,i)=>{
-    const y=(padT+(plotH*i/(tickCount-1))).toFixed(1);
-    return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2 4"/>`;
-  }).join('');
   const xLabels=rows.map((r,i)=>{
     const skip=n>10?(i%3!==0 && i!==n-1):(n>6 && i%2===1 && i!==n-1);
     if(skip) return '';
@@ -2123,64 +2106,69 @@ function renderSpendChart(){
   }).join('');
 
   // Which week is under inspection: whatever was last tapped, falling back
-  // to the highest week so there's always something useful shown by
-  // default. Every week is tappable, not just the peak, via an invisible
-  // full-height hit zone per week - small dots alone are too fiddly to tap
-  // accurately on a phone.
-  const peak=rows.slice().sort((a,b)=>b[mode]-a[mode])[0];
+  // to the busiest week (highest single income or expense point) so
+  // there's always something useful shown by default. Every week is
+  // tappable, not just the peak, via an invisible full-height hit zone per
+  // week - small dots alone are too fiddly to tap accurately on a phone.
+  const peak=rows.slice().sort((a,b)=>Math.max(b.expense,b.income)-Math.max(a.expense,a.income))[0];
   const active=(selectedSpendWeek && rows.find(r=>r.wk===selectedSpendWeek)) || peak;
   const activeIdx=rows.findIndex(r=>r.wk===active.wk);
 
-  const linePts=rows.map((r,i)=>[xAt(i),yAt(r[mode])]);
+  const incomePts=rows.map((r,i)=>[xAt(i),yIncome(r.income)]);
+  const expensePts=rows.map((r,i)=>[xAt(i),yExpense(r.expense)]);
 
   const bandStep=n>1 ? xAt(1)-xAt(0) : plotW;
   const hitZones=rows.map((r,i)=>
     `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="0" width="${bandStep.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
   ).join('');
 
-  const activeDot=`<circle cx="${xAt(activeIdx).toFixed(1)}" cy="${yAt(active[mode]).toFixed(1)}" r="7" fill="${color}" fill-opacity=".18"/>
-    <circle cx="${xAt(activeIdx).toFixed(1)}" cy="${yAt(active[mode]).toFixed(1)}" r="4" fill="var(--card)" stroke="${color}" stroke-width="2.25"/>`;
+  const guideLine=`<line x1="${xAt(activeIdx).toFixed(1)}" y1="${padT}" x2="${xAt(activeIdx).toFixed(1)}" y2="${padT+plotH}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity=".4"/>`;
+  const dot=(cx,cy,color)=>`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="${color}" fill-opacity=".18"/><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="var(--card)" stroke="${color}" stroke-width="2"/>`;
+  const activeDots=dot(xAt(activeIdx),yIncome(active.income),'var(--green)')+dot(xAt(activeIdx),yExpense(active.expense),'var(--red)');
 
-  // Sparse floating value labels, not a full $ axis - a pill for the
-  // highest point and one for the active point (deduped if they're the
-  // same point), positioned above the line and clamped inside the plot so
-  // they never clip off the edge of the chart.
-  const pillLabel=(i,v,emphasis)=>{
+  // Sparse floating value labels, not a full $ axis - one pill on the
+  // highest income point, one on the highest expense point, clamped inside
+  // the plot so they never clip off the edge of the chart.
+  const pillLabel=(i,v,y,color,side)=>{
     if(v<=0) return '';
     const text=money(v);
     const w=text.length*6.4+16;
-    let x=xAt(i); const y=yAt(v)-16;
+    let x=xAt(i);
     x=Math.min(Math.max(x,padL+w/2),W-padR-w/2);
+    const ly=side==='up'?y-16:y+16;
     return `<g>
-      <rect x="${(x-w/2).toFixed(1)}" y="${(y-13).toFixed(1)}" width="${w.toFixed(1)}" height="20" rx="10" fill="var(--card)" stroke="var(--border)"/>
-      <text x="${x.toFixed(1)}" y="${(y+1).toFixed(1)}" text-anchor="middle" class="chartLabel" fill="${emphasis?color:'var(--text)'}">${text}</text>
+      <rect x="${(x-w/2).toFixed(1)}" y="${(ly-13).toFixed(1)}" width="${w.toFixed(1)}" height="20" rx="10" fill="var(--card)" stroke="var(--border)"/>
+      <text x="${x.toFixed(1)}" y="${(ly+1).toFixed(1)}" text-anchor="middle" class="chartLabel" fill="${color}">${text}</text>
     </g>`;
   };
-  const peakIdx=rows.findIndex(r=>r.wk===peak.wk);
-  let labels=pillLabel(peakIdx,peak[mode],true);
-  if(active.wk!==peak.wk) labels+=pillLabel(activeIdx,active[mode],false);
+  const incomePeakIdx=rows.reduce((best,r,i,arr)=>r.income>arr[best].income?i:best,0);
+  const expensePeakIdx=rows.reduce((best,r,i,arr)=>r.expense>arr[best].expense?i:best,0);
+  const labels=
+    pillLabel(incomePeakIdx, rows[incomePeakIdx].income, yIncome(rows[incomePeakIdx].income), 'var(--green)', 'up')
+    + pillLabel(expensePeakIdx, rows[expensePeakIdx].expense, yExpense(rows[expensePeakIdx].expense), 'var(--red)', 'down');
 
   // Transaction breakdown for whichever week is active, collapsed unless
   // you've actually tapped a point. Lets a spike be checked and, if it's a
   // sync artifact or an internal transfer rather than real spending, its
   // transaction id added to EXCLUDED_TXN_IDS above without needing to
-  // re-add debug code each time.
+  // re-add debug code each time. Shows both income and spending together
+  // now, since the chart itself no longer separates them into two views.
   let detail='';
-  if(active && active[mode]>0){
+  if(active){
     const wkEnd=new Date(parseDate(active.wk)); wkEnd.setDate(wkEnd.getDate()+6);
     const txns=spendHistory
       .filter(t=>{
         const amt=Number(t.amount)||0;
-        return (mode==='expense'?amt<0:amt>0) && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && !isExcludedTxn(t) && t.date>=active.wk && t.date<=iso(wkEnd);
+        return amt && (bankIds.has(t.accountId)||latIds.has(t.accountId)) && !isExcludedTxn(t) && t.date>=active.wk && t.date<=iso(wkEnd);
       })
-      .sort((a,b)=>mode==='expense'?a.amount-b.amount:b.amount-a.amount);
+      .sort((a,b)=>a.amount-b.amount);
     const isPeak=active.wk===peak.wk;
     detail=`
     <details class="fnSettings" style="margin-top:14px"${selectedSpendWeek?' open':''}>
-      <summary>Week of ${shortDate(parseDate(active.wk))} · ${money(active[mode])}${isPeak?' · highest week':''}</summary>
+      <summary>Week of ${shortDate(parseDate(active.wk))} · income ${money(active.income)} · expense ${money(active.expense)}${isPeak?' · busiest week':''}</summary>
       <table class="table" style="margin-top:10px">
         <thead><tr><th>Date</th><th class="hideMobile">Account</th><th>Payee</th><th>Amount</th></tr></thead>
-        <tbody>${txns.length?txns.map(t=>`<tr><td>${niceDate(parseDate(t.date))}</td><td class="hideMobile">${bankIds.has(t.accountId)?'CommBank':'Latitude'}</td><td>${escHtml(t.payee||'(no payee)')}<span style="display:block;font-size:11px;color:var(--muted)">id ${escHtml(String(t.id))}</span></td><td>${money(t.amount)}</td></tr>`).join(''):`<tr><td colspan="4">No ${mode==='expense'?'spending':'income'} counted this week (everything landed outside CommBank/Latitude or was excluded).</td></tr>`}</tbody>
+        <tbody>${txns.length?txns.map(t=>`<tr><td>${niceDate(parseDate(t.date))}</td><td class="hideMobile">${bankIds.has(t.accountId)?'CommBank':'Latitude'}</td><td>${escHtml(t.payee||'(no payee)')}<span style="display:block;font-size:11px;color:var(--muted)">id ${escHtml(String(t.id))}</span></td><td style="color:${t.amount<0?'var(--red)':'var(--green)'}">${money(t.amount)}</td></tr>`).join(''):'<tr><td colspan="4">No transactions counted this week (everything landed outside CommBank/Latitude or was excluded).</td></tr>'}</tbody>
       </table>
     </details>`;
   }
@@ -2188,25 +2176,33 @@ function renderSpendChart(){
   box.innerHTML=`
     <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
       <defs>
-        <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity=".32"/>
-          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        <linearGradient id="spendGradIncome" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--green)" stop-opacity=".28"/>
+          <stop offset="100%" stop-color="var(--green)" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="spendGradExpense" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--red)" stop-opacity="0"/>
+          <stop offset="100%" stop-color="var(--red)" stop-opacity=".28"/>
         </linearGradient>
       </defs>
-      ${gridLines}
-      <path d="${monotoneAreaPath(linePts,baseY)}" fill="url(#spendGrad)"/>
-      <path d="${monotonePath(linePts)}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      ${activeDot}
+      <line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W-padR}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+      <path d="${monotoneAreaPath(incomePts,baseY)}" fill="url(#spendGradIncome)"/>
+      <path d="${monotoneAreaPath(expensePts,baseY)}" fill="url(#spendGradExpense)"/>
+      <path d="${monotonePath(incomePts)}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${monotonePath(expensePts)}" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${guideLine}
+      ${activeDots}
       ${labels}
       ${xLabels}
       ${hitZones}
     </svg>
     <div class="chartLegend">
-      <span class="chartBig">${money(active[mode])}</span>
-      <span class="chartSub">Week of ${shortDate(parseDate(active.wk))}${active.wk===peak.wk?' · highest week':''}</span>
+      <span class="chartStat"><span class="chartSub">Income</span><b class="chartBig" style="color:var(--green)">${money(active.income)}</b></span>
+      <span class="chartStat"><span class="chartSub">Expense</span><b class="chartBig" style="color:var(--red)">${money(active.expense)}</b></span>
+      <span class="chartStat"><span class="chartSub">Net</span><b class="chartBig" style="color:${active.net>=0?'var(--green)':'var(--red)'}">${money(active.net)}</b></span>
       <span class="chartHint">Tap a point to inspect that week</span>
     </div>
-    <div class="fnSub" style="margin-top:6px">${n} week${n===1?'':'s'} of ${mode==='expense'?'spending':'income'}, pulled from PocketSmith.</div>
+    <div class="fnSub" style="margin-top:6px">Week of ${shortDate(parseDate(active.wk))}${active.wk===peak.wk?' · busiest week':''} · ${n} week${n===1?'':'s'} of cash flow, pulled from PocketSmith.</div>
     ${detail}`;
 }
 
