@@ -1969,6 +1969,12 @@ const EXCLUDED_TXN_IDS=new Set([1928246835]);
 //   - "GEM VISA" in the payee: paying down your own Latitude card from
 //     CommBank. Confirmed via a $7,763.89 direct debit matching the exact
 //     amount of the reversal artifact above.
+//   - "ONLINE ACCOUNT PAYMENT" on Latitude: the other side of that same
+//     GEM VISA payment - CommBank debits $7,763.89 labelled "GEM VISA",
+//     Latitude credits the same $7,763.89 same day labelled "ONLINE
+//     ACCOUNT PAYMENT" (id 1928246820, 2026-06-11). Without this it shows
+//     up as income on Latitude, which it isn't - it's your own card
+//     payment landing on the other account.
 //   - "Transfer to xx5846": your own Bills account (matches its real
 //     number). Confirmed recurring - seen at $400 and $1,600 so far.
 //   - "Transfer to xx2235" / "Transfer to xx0678": same masked-account,
@@ -1976,7 +1982,7 @@ const EXCLUDED_TXN_IDS=new Set([1928246835]);
 //     this history, which always shows an actual business or payee name.
 //     Not independently confirmed the way xx5846 is, but the pattern match
 //     is strong enough to treat the same way.
-const EXCLUDED_PAYEE_PATTERNS=[/gem visa/i, /transfer to xx5846/i, /transfer to xx2235/i, /transfer to xx0678/i];
+const EXCLUDED_PAYEE_PATTERNS=[/gem visa/i, /online account payment/i, /transfer to xx5846/i, /transfer to xx2235/i, /transfer to xx0678/i];
 function isExcludedTxn(t){
   return EXCLUDED_TXN_IDS.has(t.id) || EXCLUDED_PAYEE_PATTERNS.some(p=>p.test(t.payee||''));
 }
