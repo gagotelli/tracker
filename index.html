@@ -203,6 +203,7 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .chartSub{font-size:12px;color:var(--muted)}
 .chartHint{margin-left:auto;font-size:11px;letter-spacing:.02em;color:var(--muted)}
 @media(max-width:520px){.chartHint{margin-left:0;flex-basis:100%;margin-top:6px}}
+.forecastBand{fill:#f5c94a;fill-opacity:.12}
 
 /* ===== THIS FORTNIGHT: mobile fit =====
    These tables are narrow by design and must never trigger the card's
@@ -238,11 +239,13 @@ body.theme-dark{--bg:#0b1220;--card:#141d31;--text:#f2f5fa;--muted:#9aa5b8;--bor
 body.theme-dark .soon{background:#3a2f10;color:#ffd98a}
 body.theme-dark .overdue{background:#3a1a1a;color:#ffb4b4}
 body.theme-dark .ok{background:#13331f;color:#8ee6ad}
+body.theme-dark .forecastBand{fill-opacity:.08}
 @media (prefers-color-scheme: dark){
   body.theme-system{--bg:#0b1220;--card:#141d31;--text:#f2f5fa;--muted:#9aa5b8;--border:#26314b;--soft:#1a2540;--accent:#3f5bd6;--accentText:#fff;--shadow:0 1px 2px rgba(0,0,0,.3)}
   body.theme-system .soon{background:#3a2f10;color:#ffd98a}
   body.theme-system .overdue{background:#3a1a1a;color:#ffb4b4}
   body.theme-system .ok{background:#13331f;color:#8ee6ad}
+  body.theme-system .forecastBand{fill-opacity:.08}
 }
 @media(max-width:900px){
   .span4,.span6,.span12{grid-column:span 12}.account{flex-direction:column}.metric{border-left:0;padding-left:0}
@@ -2001,6 +2004,46 @@ function barPath(cx,baseY,tipY,width,radius){
     +`L ${(cx+half).toFixed(1)},${baseY.toFixed(1)} Z`;
 }
 
+// Monotone cubic (Fritsch-Carlson) Hermite interpolation, converted to
+// bezier segments. Only used for the thin net-cashflow line overlaid on
+// the bars - it never overshoots past a point's own value on the way to
+// its neighbour, so a single sharp week can't balloon the curve above or
+// below the real number.
+function monotonePath(pts){
+  if(!pts.length) return '';
+  if(pts.length<2) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  const n=pts.length;
+  const d=[];
+  for(let i=0;i<n-1;i++){
+    const dx=pts[i+1][0]-pts[i][0];
+    d.push(dx===0?0:(pts[i+1][1]-pts[i][1])/dx);
+  }
+  const m=new Array(n);
+  m[0]=d[0]||0;
+  m[n-1]=d[n-2]||0;
+  for(let i=1;i<n-1;i++){
+    if(d[i-1]===0||d[i]===0||(d[i-1]<0)!==(d[i]<0)) m[i]=0;
+    else m[i]=(d[i-1]+d[i])/2;
+  }
+  for(let i=0;i<n-1;i++){
+    if(d[i]===0){ m[i]=0; m[i+1]=0; continue; }
+    const a=m[i]/d[i], b=m[i+1]/d[i], s=a*a+b*b;
+    if(s>9){
+      const tau=3/Math.sqrt(s);
+      m[i]=tau*a*d[i];
+      m[i+1]=tau*b*d[i];
+    }
+  }
+  let path=`M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for(let i=0;i<pts.length-1;i++){
+    const dx=(pts[i+1][0]-pts[i][0])/3;
+    const c1x=pts[i][0]+dx, c1y=pts[i][1]+m[i]*dx;
+    const c2x=pts[i+1][0]-dx, c2y=pts[i+1][1]-m[i+1]*dx;
+    path+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${pts[i+1][0].toFixed(1)},${pts[i+1][1].toFixed(1)}`;
+  }
+  return path;
+}
+
 // Weekly cash flow, Monday-start buckets, as a diverging bar chart: income
 // bars grow up from a shared zero baseline, expense bars grow down from the
 // same baseline. Bars over a smooth line because a weekly total is a
@@ -2059,7 +2102,34 @@ function renderSpendChart(){
     box.innerHTML='<div class="fnSub">No spending or income in the synced history yet.</div>';
     return;
   }
-  const rows=weekKeys.map(wk=>({wk, expense:buckets[wk].expense, income:buckets[wk].income, net:buckets[wk].income-buckets[wk].expense}));
+  const realRows=weekKeys.map(wk=>({wk, expense:buckets[wk].expense, income:buckets[wk].income, net:buckets[wk].income-buckets[wk].expense, forecast:false}));
+
+  // Forecast: the weeks after the last real one, built from what's already
+  // committed rather than a guess - scheduled bills for expense, the
+  // fortnightly salary landing on whichever paydays fall in that week for
+  // income. No real transactions exist yet for the future, so this is the
+  // best available answer to "what does next month look like."
+  const FORECAST_WEEKS=4;
+  const lastRealWk=parseDate(realRows[realRows.length-1].wk);
+  const salary=Number(data.settings.fortnightlyIncome)||0;
+  const paydays=[];
+  if(salary>0){
+    let pd=parseDate(data.settings.nextPayday||iso(today()));
+    const horizonEnd=new Date(lastRealWk); horizonEnd.setDate(horizonEnd.getDate()+7*(FORECAST_WEEKS+1));
+    let guard=0;
+    while(pd<=horizonEnd && guard<40){ paydays.push(new Date(pd)); pd=addCycle(pd,'Fortnightly'); guard++; }
+  }
+  const forecastRows=[];
+  for(let i=1;i<=FORECAST_WEEKS;i++){
+    const wkStartDate=new Date(lastRealWk); wkStartDate.setDate(wkStartDate.getDate()+7*i);
+    const wkEndDate=new Date(wkStartDate); wkEndDate.setDate(wkEndDate.getDate()+6);
+    const dueBills=(data.bills||[]).flatMap(b=>dueInstancesInWindow(b,wkStartDate,wkEndDate));
+    const expense=dueBills.reduce((s,b)=>s+Number(b.amount||0),0);
+    const income=paydays.filter(pd=>pd>=wkStartDate && pd<=wkEndDate).length*salary;
+    forecastRows.push({wk:iso(wkStartDate), expense, income, net:income-expense, forecast:true});
+  }
+  const rows=realRows.concat(forecastRows);
+  const lastRealIdx=realRows.length-1;
   const rawMax=Math.max(...rows.map(r=>Math.max(r.expense,r.income)), 1);
 
   const W=760, H=280, padL=16, padR=16, padT=34, padB=46;
@@ -2071,44 +2141,74 @@ function renderSpendChart(){
   const scale=rawMax*1.2;
   const yIncome=v=> baseY-(Math.max(0,v)/scale*halfH);
   const yExpense=v=> baseY+(Math.max(0,v)/scale*halfH);
+  const yNet=v=> baseY-(v/scale*halfH);
 
   const xLabels=rows.map((r,i)=>{
-    const skip=n>10?(i%3!==0 && i!==n-1):(n>6 && i%2===1 && i!==n-1);
+    const nearToday=i===lastRealIdx || i===lastRealIdx+1;
+    const skip=!nearToday && (n>10?(i%3!==0 && i!==n-1):(n>6 && i%2===1 && i!==n-1));
     if(skip) return '';
     return `<text x="${xAt(i).toFixed(1)}" y="${H-6}" text-anchor="middle" class="chartAxis">${shortDate(parseDate(r.wk))}</text>`;
   }).join('');
 
   // Which week is under inspection: whatever was last tapped, falling back
-  // to the busiest week (highest single income or expense point) so
-  // there's always something useful shown by default. Every week is
-  // tappable, not just the peak, via an invisible full-height hit zone per
-  // week - small dots alone are too fiddly to tap accurately on a phone.
-  const peak=rows.slice().sort((a,b)=>Math.max(b.expense,b.income)-Math.max(a.expense,a.income))[0];
-  const active=(selectedSpendWeek && rows.find(r=>r.wk===selectedSpendWeek)) || peak;
+  // to the busiest real week (highest single income or expense point) so
+  // there's always something useful shown by default. Only real weeks are
+  // selectable - forecast weeks have no transactions to show a breakdown
+  // of. Every real week is tappable via an invisible full-height hit zone
+  // per week - small dots alone are too fiddly to tap accurately on a phone.
+  const peak=realRows.slice().sort((a,b)=>Math.max(b.expense,b.income)-Math.max(a.expense,a.income))[0];
+  const active=(selectedSpendWeek && realRows.find(r=>r.wk===selectedSpendWeek)) || peak;
   const activeIdx=rows.findIndex(r=>r.wk===active.wk);
 
   const bandStep=n>1 ? xAt(1)-xAt(0) : plotW;
   const hitZones=rows.map((r,i)=>
-    `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="0" width="${bandStep.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
+    r.forecast ? '' : `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="0" width="${bandStep.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
   ).join('');
+
+  // "Today" divider + a shaded band over the forecast weeks, same idea
+  // Copilot's cash flow view uses to separate what happened from what's
+  // scheduled. Forecast bars render at a fixed dim opacity regardless of
+  // tap state, since they're not selectable.
+  let todayMarker='';
+  if(forecastRows.length){
+    const boundaryX=xAt(lastRealIdx)+bandStep/2;
+    todayMarker=`
+      <rect x="${boundaryX.toFixed(1)}" y="${padT}" width="${(W-padR-boundaryX).toFixed(1)}" height="${plotH}" class="forecastBand"/>
+      <line x1="${boundaryX.toFixed(1)}" y1="${padT}" x2="${boundaryX.toFixed(1)}" y2="${padT+plotH}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity=".5"/>
+      <text x="${(boundaryX+5).toFixed(1)}" y="${(padT+10).toFixed(1)}" class="chartAxis">Today</text>`;
+  }
 
   // Bar spec: capped at 24px so it never fills the slot, 4px rounded cap at
   // the value end. Direction (up/down) is read off tipY vs baseY inside
-  // barPath, so the same call draws either half of the pair.
+  // barPath, so the same call draws either half of the pair. Expense is a
+  // neutral gray rather than red here - the line + forecast band already
+  // carry the "watch this" signal, red is reserved for Net going negative.
   const barWidth=Math.max(4,Math.min(24,bandStep*0.42));
   const bars=rows.map((r,i)=>{
     const cx=xAt(i);
-    const op=r.wk===active.wk?1:.55; // dim every week but the one under inspection
+    const op=r.forecast?.35:(r.wk===active.wk?1:.55);
     let g='';
     if(r.income>0) g+=`<path d="${barPath(cx,baseY,yIncome(r.income),barWidth,4)}" fill="var(--green)" fill-opacity="${op}"/>`;
-    if(r.expense>0) g+=`<path d="${barPath(cx,baseY,yExpense(r.expense),barWidth,4)}" fill="var(--red)" fill-opacity="${op}"/>`;
+    if(r.expense>0) g+=`<path d="${barPath(cx,baseY,yExpense(r.expense),barWidth,4)}" fill="var(--muted)" fill-opacity="${op}"/>`;
     return g;
   }).join('');
 
-  // Sparse floating value labels, not a full $ axis - one pill on the
-  // highest income bar, one on the highest expense bar, plus the tapped
-  // week's own bars if it isn't already one of those two peaks. Clamped
-  // inside the plot so they never clip off the edge of the chart.
+  // Net line: income minus expense, on the same signed scale as the bars
+  // (positive goes up like income, negative goes down like expense), drawn
+  // across every week including the forecast so the trend reads as one
+  // continuous line instead of stopping dead at Today.
+  const netPts=rows.map((r,i)=>[xAt(i),yNet(r.net)]);
+  const netLine=`<path d="${monotonePath(netPts)}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const netDots=netPts.map(([x,y])=>`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="var(--blue)" stroke="var(--card)" stroke-width="1.5"/>`).join('');
+
+  // Minimal two-value axis - the scale's top and the zero baseline - not a
+  // full tick ladder. Sparse floating pills carry the rest: one on the
+  // highest income bar, one on the highest expense bar (checked across
+  // both real and forecast weeks, so an upcoming big bill still gets
+  // flagged), plus the tapped week's own bars if it isn't already one of
+  // those two peaks. Clamped inside the plot so nothing clips off the edge.
+  const topLabel=`<text x="${padL}" y="${(padT+4).toFixed(1)}" text-anchor="start" class="chartAxis">${money(scale)}</text>`;
+  const zeroLabel=`<text x="${(W-padR).toFixed(1)}" y="${(baseY+4).toFixed(1)}" text-anchor="end" class="chartAxis">0</text>`;
   const pillLabel=(i,v,y,color,side)=>{
     if(v<=0) return '';
     const text=money(v);
@@ -2125,9 +2225,9 @@ function renderSpendChart(){
   const expensePeakIdx=rows.reduce((best,r,i,arr)=>r.expense>arr[best].expense?i:best,0);
   let labels=
     pillLabel(incomePeakIdx, rows[incomePeakIdx].income, yIncome(rows[incomePeakIdx].income), 'var(--green)', 'up')
-    + pillLabel(expensePeakIdx, rows[expensePeakIdx].expense, yExpense(rows[expensePeakIdx].expense), 'var(--red)', 'down');
+    + pillLabel(expensePeakIdx, rows[expensePeakIdx].expense, yExpense(rows[expensePeakIdx].expense), 'var(--text)', 'down');
   if(activeIdx!==incomePeakIdx && active.income>0) labels+=pillLabel(activeIdx, active.income, yIncome(active.income), 'var(--green)', 'up');
-  if(activeIdx!==expensePeakIdx && active.expense>0) labels+=pillLabel(activeIdx, active.expense, yExpense(active.expense), 'var(--red)', 'down');
+  if(activeIdx!==expensePeakIdx && active.expense>0) labels+=pillLabel(activeIdx, active.expense, yExpense(active.expense), 'var(--text)', 'down');
 
   // Transaction breakdown for whichever week is active, collapsed unless
   // you've actually tapped a point. Lets a spike be checked and, if it's a
@@ -2157,19 +2257,24 @@ function renderSpendChart(){
 
   box.innerHTML=`
     <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
+      ${todayMarker}
       <line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W-padR}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
       ${bars}
+      ${netLine}
+      ${netDots}
       ${labels}
+      ${topLabel}
+      ${zeroLabel}
       ${xLabels}
       ${hitZones}
     </svg>
     <div class="chartLegend">
       <span class="chartStat"><span class="chartSub">Income</span><b class="chartBig" style="color:var(--green)">${money(active.income)}</b></span>
-      <span class="chartStat"><span class="chartSub">Expense</span><b class="chartBig" style="color:var(--red)">${money(active.expense)}</b></span>
+      <span class="chartStat"><span class="chartSub">Expense</span><b class="chartBig">${money(active.expense)}</b></span>
       <span class="chartStat"><span class="chartSub">Net</span><b class="chartBig" style="color:${active.net>=0?'var(--green)':'var(--red)'}">${money(active.net)}</b></span>
       <span class="chartHint">Tap a point to inspect that week</span>
     </div>
-    <div class="fnSub" style="margin-top:6px">Week of ${shortDate(parseDate(active.wk))}${active.wk===peak.wk?' · busiest week':''} · ${n} week${n===1?'':'s'} of cash flow, pulled from PocketSmith.</div>
+    <div class="fnSub" style="margin-top:6px">${realRows.length} week${realRows.length===1?'':'s'} of actual cash flow pulled from PocketSmith, plus a ${forecastRows.length}-week forecast from scheduled bills and salary.</div>
     ${detail}`;
 }
 
