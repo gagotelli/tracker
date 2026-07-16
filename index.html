@@ -1981,62 +1981,39 @@ function isExcludedTxn(t){
   return EXCLUDED_TXN_IDS.has(t.id) || EXCLUDED_PAYEE_PATTERNS.some(p=>p.test(t.payee||''));
 }
 
-// Monotone cubic (Fritsch-Carlson) Hermite interpolation, converted to
-// bezier segments. Unlike the Catmull-Rom spline this replaced, it never
-// overshoots past a point's own value on the way to its neighbour, so a
-// sharp single-week spike can't make the curve balloon above or dip below
-// the real data - which is what was reading as "not smooth" before.
-function monotoneTangents(pts){
-  const n=pts.length;
-  const d=[];
-  for(let i=0;i<n-1;i++){
-    const dx=pts[i+1][0]-pts[i][0];
-    d.push(dx===0?0:(pts[i+1][1]-pts[i][1])/dx);
+// A single bar: rounded 4px cap at the value end, square where it meets the
+// shared zero baseline (never rounded there - it's an anchor, not an edge).
+// Direction (up vs down) is read off whether tipY lands above or below
+// baseY, so the same helper draws both the income and expense bars.
+function barPath(cx,baseY,tipY,width,radius){
+  const half=width/2;
+  const up=tipY<baseY;
+  const r=Math.max(0,Math.min(radius,half,Math.abs(tipY-baseY)));
+  if(up){
+    return `M ${(cx-half).toFixed(1)},${baseY.toFixed(1)} `
+      +`L ${(cx-half).toFixed(1)},${(tipY+r).toFixed(1)} `
+      +`Q ${(cx-half).toFixed(1)},${tipY.toFixed(1)} ${(cx-half+r).toFixed(1)},${tipY.toFixed(1)} `
+      +`L ${(cx+half-r).toFixed(1)},${tipY.toFixed(1)} `
+      +`Q ${(cx+half).toFixed(1)},${tipY.toFixed(1)} ${(cx+half).toFixed(1)},${(tipY+r).toFixed(1)} `
+      +`L ${(cx+half).toFixed(1)},${baseY.toFixed(1)} Z`;
   }
-  const m=new Array(n);
-  m[0]=d[0]||0;
-  m[n-1]=d[n-2]||0;
-  for(let i=1;i<n-1;i++){
-    if(d[i-1]===0||d[i]===0||(d[i-1]<0)!==(d[i]<0)) m[i]=0;
-    else m[i]=(d[i-1]+d[i])/2;
-  }
-  for(let i=0;i<n-1;i++){
-    if(d[i]===0){ m[i]=0; m[i+1]=0; continue; }
-    const a=m[i]/d[i], b=m[i+1]/d[i], s=a*a+b*b;
-    if(s>9){
-      const tau=3/Math.sqrt(s);
-      m[i]=tau*a*d[i];
-      m[i+1]=tau*b*d[i];
-    }
-  }
-  return m;
-}
-function monotonePath(pts){
-  if(!pts.length) return '';
-  if(pts.length<2) return `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
-  const m=monotoneTangents(pts);
-  let d=`M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
-  for(let i=0;i<pts.length-1;i++){
-    const dx=(pts[i+1][0]-pts[i][0])/3;
-    const c1x=pts[i][0]+dx, c1y=pts[i][1]+m[i]*dx;
-    const c2x=pts[i+1][0]-dx, c2y=pts[i+1][1]-m[i+1]*dx;
-    d+=` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${pts[i+1][0].toFixed(1)},${pts[i+1][1].toFixed(1)}`;
-  }
-  return d;
-}
-function monotoneAreaPath(pts,baseY){
-  if(pts.length<1) return '';
-  const first=pts[0], last=pts[pts.length-1];
-  return `${monotonePath(pts)} L ${last[0].toFixed(1)},${baseY.toFixed(1)} L ${first[0].toFixed(1)},${baseY.toFixed(1)} Z`;
+  return `M ${(cx-half).toFixed(1)},${baseY.toFixed(1)} `
+    +`L ${(cx-half).toFixed(1)},${(tipY-r).toFixed(1)} `
+    +`Q ${(cx-half).toFixed(1)},${tipY.toFixed(1)} ${(cx-half+r).toFixed(1)},${tipY.toFixed(1)} `
+    +`L ${(cx+half-r).toFixed(1)},${tipY.toFixed(1)} `
+    +`Q ${(cx+half).toFixed(1)},${tipY.toFixed(1)} ${(cx+half).toFixed(1)},${(tipY-r).toFixed(1)} `
+    +`L ${(cx+half).toFixed(1)},${baseY.toFixed(1)} Z`;
 }
 
-// Weekly cash flow, Monday-start buckets: one merged chart instead of a
-// toggle between two separate ones. Income is plotted upward from a shared
-// zero baseline, expense mirrored downward from the same baseline - a
-// diverging/butterfly chart, the same idea Copilot and Monarch use for
-// income-vs-spending trend views, just hand-built in SVG. It reads as one
-// picture of the week (both lines share an x-axis and a scale) instead of
-// two separate charts you have to flip between to compare.
+// Weekly cash flow, Monday-start buckets, as a diverging bar chart: income
+// bars grow up from a shared zero baseline, expense bars grow down from the
+// same baseline. Bars over a smooth line because a weekly total is a
+// discrete bucketed sum, not a continuous function - a bar says "this week
+// totaled $X" without implying values in between two weeks that were never
+// measured. Same idea Copilot and Monarch use for income-vs-spending trend
+// views, just hand-built in SVG. Tapping a week dims every other week's
+// bars instead of drawing a separate marker, since the bar's own tip is
+// already the value marker.
 // Purely a client-side aggregation + SVG render of whatever
 // loadSpendHistory() already fetched, so this is cheap to call from every
 // render() pass. No charting library: this app loads nothing but the
@@ -2114,21 +2091,28 @@ function renderSpendChart(){
   const active=(selectedSpendWeek && rows.find(r=>r.wk===selectedSpendWeek)) || peak;
   const activeIdx=rows.findIndex(r=>r.wk===active.wk);
 
-  const incomePts=rows.map((r,i)=>[xAt(i),yIncome(r.income)]);
-  const expensePts=rows.map((r,i)=>[xAt(i),yExpense(r.expense)]);
-
   const bandStep=n>1 ? xAt(1)-xAt(0) : plotW;
   const hitZones=rows.map((r,i)=>
     `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="0" width="${bandStep.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
   ).join('');
 
-  const guideLine=`<line x1="${xAt(activeIdx).toFixed(1)}" y1="${padT}" x2="${xAt(activeIdx).toFixed(1)}" y2="${padT+plotH}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity=".4"/>`;
-  const dot=(cx,cy,color)=>`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="${color}" fill-opacity=".18"/><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="var(--card)" stroke="${color}" stroke-width="2"/>`;
-  const activeDots=dot(xAt(activeIdx),yIncome(active.income),'var(--green)')+dot(xAt(activeIdx),yExpense(active.expense),'var(--red)');
+  // Bar spec: capped at 24px so it never fills the slot, 4px rounded cap at
+  // the value end. Direction (up/down) is read off tipY vs baseY inside
+  // barPath, so the same call draws either half of the pair.
+  const barWidth=Math.max(4,Math.min(24,bandStep*0.42));
+  const bars=rows.map((r,i)=>{
+    const cx=xAt(i);
+    const op=r.wk===active.wk?1:.55; // dim every week but the one under inspection
+    let g='';
+    if(r.income>0) g+=`<path d="${barPath(cx,baseY,yIncome(r.income),barWidth,4)}" fill="var(--green)" fill-opacity="${op}"/>`;
+    if(r.expense>0) g+=`<path d="${barPath(cx,baseY,yExpense(r.expense),barWidth,4)}" fill="var(--red)" fill-opacity="${op}"/>`;
+    return g;
+  }).join('');
 
   // Sparse floating value labels, not a full $ axis - one pill on the
-  // highest income point, one on the highest expense point, clamped inside
-  // the plot so they never clip off the edge of the chart.
+  // highest income bar, one on the highest expense bar, plus the tapped
+  // week's own bars if it isn't already one of those two peaks. Clamped
+  // inside the plot so they never clip off the edge of the chart.
   const pillLabel=(i,v,y,color,side)=>{
     if(v<=0) return '';
     const text=money(v);
@@ -2143,9 +2127,11 @@ function renderSpendChart(){
   };
   const incomePeakIdx=rows.reduce((best,r,i,arr)=>r.income>arr[best].income?i:best,0);
   const expensePeakIdx=rows.reduce((best,r,i,arr)=>r.expense>arr[best].expense?i:best,0);
-  const labels=
+  let labels=
     pillLabel(incomePeakIdx, rows[incomePeakIdx].income, yIncome(rows[incomePeakIdx].income), 'var(--green)', 'up')
     + pillLabel(expensePeakIdx, rows[expensePeakIdx].expense, yExpense(rows[expensePeakIdx].expense), 'var(--red)', 'down');
+  if(activeIdx!==incomePeakIdx && active.income>0) labels+=pillLabel(activeIdx, active.income, yIncome(active.income), 'var(--green)', 'up');
+  if(activeIdx!==expensePeakIdx && active.expense>0) labels+=pillLabel(activeIdx, active.expense, yExpense(active.expense), 'var(--red)', 'down');
 
   // Transaction breakdown for whichever week is active, collapsed unless
   // you've actually tapped a point. Lets a spike be checked and, if it's a
@@ -2175,23 +2161,8 @@ function renderSpendChart(){
 
   box.innerHTML=`
     <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
-      <defs>
-        <linearGradient id="spendGradIncome" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--green)" stop-opacity=".28"/>
-          <stop offset="100%" stop-color="var(--green)" stop-opacity="0"/>
-        </linearGradient>
-        <linearGradient id="spendGradExpense" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--red)" stop-opacity="0"/>
-          <stop offset="100%" stop-color="var(--red)" stop-opacity=".28"/>
-        </linearGradient>
-      </defs>
       <line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W-padR}" y2="${baseY.toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
-      <path d="${monotoneAreaPath(incomePts,baseY)}" fill="url(#spendGradIncome)"/>
-      <path d="${monotoneAreaPath(expensePts,baseY)}" fill="url(#spendGradExpense)"/>
-      <path d="${monotonePath(incomePts)}" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      <path d="${monotonePath(expensePts)}" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      ${guideLine}
-      ${activeDots}
+      ${bars}
       ${labels}
       ${xLabels}
       ${hitZones}
