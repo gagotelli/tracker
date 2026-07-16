@@ -143,8 +143,10 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .profileSwitch{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 .profileBtn{border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:999px;padding:9px 15px;font-weight:700;cursor:pointer}
 .profileBtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.progressOuter{height:12px;background:var(--soft);border-radius:999px;overflow:hidden;margin-top:10px}
-.progressInner{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:999px;width:0%}
+.arcMeter{position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.arcMeterLabel{position:absolute;display:flex;flex-direction:column;align-items:center;font-family:var(--mono);font-weight:800;color:var(--text);line-height:1.15}
+.arcMeterLabel span{font-weight:600;font-size:.4em;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.cardMetricRow{display:flex;justify-content:space-between;align-items:center;gap:16px}
 .paydayCards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:16px}
 
 /* ===== THIS FORTNIGHT ===== */
@@ -929,6 +931,30 @@ function defaultCardColor(name){
   if(n.includes('gem') || n.includes('latitude')) return '#8e35b8';
   return '#2f77d0';
 }
+
+// Shared "how far along is this" graph: a ring, muted track behind a
+// coloured progress arc, percentage centred inside. Used by CARDS
+// (utilisation), LOANS (% paid) and TOTAL DEBT (overall % paid off) so
+// all three read as one visual language instead of three different bar
+// styles. Meter spec: unfilled track is a lighter step of the same
+// surface, not a second colour - the fill alone carries the value.
+function arcMeter(pct,color,size,caption){
+  size=size||64;
+  const stroke=Math.max(4,Math.round(size*0.09));
+  const r=(size-stroke)/2, c=size/2;
+  const circumference=2*Math.PI*r;
+  const clamped=Math.max(0,Math.min(100,Number(pct)||0));
+  const dash=circumference*clamped/100;
+  const fontSize=Math.round(size*0.22);
+  return `<div class="arcMeter" style="width:${size}px;height:${size}px">
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--soft)" stroke-width="${stroke}"/>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+        stroke-dasharray="${dash.toFixed(1)} ${circumference.toFixed(1)}" transform="rotate(-90 ${c} ${c})"/>
+    </svg>
+    <div class="arcMeterLabel" style="font-size:${fontSize}px">${clamped.toFixed(0)}%${caption?`<span>${escHtml(caption)}</span>`:''}</div>
+  </div>`;
+}
 function applyV5Fixes(s){
   if(Number(s.migrated) >= 5) return false;
   Object.values(s.profiles || {}).forEach(p=>{
@@ -1460,12 +1486,17 @@ function render(){
       const subgrid=`<div class="subgrid" style="margin-top:12px;grid-template-columns:1fr">
           <div><div class="label">Payment due</div><b class="danger">${escHtml(dueDate)}</b></div>
         </div>`;
+      const meterColor=u>=90?'var(--red)':u>=70?'#b77900':'var(--green)';
       return `<div class="card span6">
         <div class="acctHead"><div class="logo">${cardIconSvg(a.color||defaultCardColor(a.name))}</div><div class="name">${escHtml(a.name)}</div></div>
-        <div class="cardBal">${money(balance)}</div>
-        <div class="cardBalLbl">owing of ${money(a.limit)} limit${live!=null?' &middot; synced from PocketSmith':''}</div>
-        <div class="progressOuter" style="margin:10px 0 6px"><div class="progressInner" style="width:${u}%"></div></div>
-        <div class="cardUtil"><b class="${klass}">${u.toFixed(1)}%</b> used<span>${money(available)} available</span></div>
+        <div class="cardMetricRow" style="margin-top:10px">
+          <div>
+            <div class="cardBal">${money(balance)}</div>
+            <div class="cardBalLbl">owing of ${money(a.limit)} limit${live!=null?' &middot; synced from PocketSmith':''}</div>
+            <div class="cardUtil" style="margin-top:8px"><b class="${klass}">${u.toFixed(1)}%</b> used<span>${money(available)} available</span></div>
+          </div>
+          ${arcMeter(u,meterColor,64)}
+        </div>
         ${subgrid}
       </div>`;
     }).join('');
@@ -1500,9 +1531,8 @@ function render(){
               <div class="fnBig">${money(remain)}</div>
               <div class="fnSub">${money(paid)} paid of ${money(total)}</div>
             </div>
-            <div class="loanPct"><b>${pct.toFixed(1)}%</b><span>paid off</span></div>
+            ${arcMeter(pct,l.color||'var(--blue)',64,'paid off')}
           </div>
-          <div class="progressOuter" style="margin:14px 0 6px"><div class="progressInner" style="width:${pct}%"></div></div>
           <div class="subgrid" style="margin-top:14px">
             <div><div class="label">Payment</div><b>${money(l.paymentAmount)} <span class="fnDue">${escHtml(l.repeat||'Fortnightly')}</span></b></div>
             <div><div class="label">Next debit</div><b>${nextDebit}</b></div>
@@ -1581,6 +1611,10 @@ function render(){
         return {tracked:false};
       });
 
+      const trackedInfo=paidInfo.filter(p=>p.tracked);
+      const overallOf=trackedInfo.reduce((s,p)=>s+p.of,0);
+      const overallPct=overallOf>0?trackedInfo.reduce((s,p)=>s+p.paid,0)/overallOf*100:0;
+
       panel.innerHTML=`
         <div class="loanTop">
           <div>
@@ -1588,6 +1622,7 @@ function render(){
             <div class="fnBig">${money(total)}</div>
             <div class="fnSub">across ${debts.length} account${debts.length===1?'':'s'}</div>
           </div>
+          ${trackedInfo.length?arcMeter(overallPct,'var(--blue)',64,'paid off'):''}
           <div class="loanPct">
             <b class="${clear?'':'muted'}">${span}</b><span>${clear?'to clear':'no repayments set'}</span>
           </div>
