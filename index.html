@@ -783,6 +783,7 @@ const firebaseConfig = {
         <label>Fortnightly salary<input id="setIncome" type="number" step="0.01"><span class="fnHint">Reference only</span></label>
         <label>Set aside as savings<input id="setSavings" type="number" step="0.01"><span class="fnHint">Reminder only, not deducted from Safe to spend</span></label>
         <label>Next payday<input id="setPayday" type="date" readonly title="Calculated from your fortnightly cycle"><span class="fnHint">Calculated automatically</span></label>
+        <label>Low balance alert threshold<input id="setLowBalance" type="number" step="0.01" placeholder="0 = off"><span class="fnHint">Emails you if your Personal/Bills balance drops below this, checked daily alongside the bill alert. Leave at 0 to turn off.</span></label>
       </div>
       <div class="actions"><button class="btn" onclick="saveProfileSettings()">Save plan</button></div>
     </div>
@@ -1745,7 +1746,7 @@ function render(){
       }).join('') || '<tr><td colspan="6">No loans yet. Use Add a loan above.</td></tr>';
     }
 
-    setCash.value=data.settings.cashAvailable||0; setIncome.value=data.settings.fortnightlyIncome||0; setSavings.value=(data.settings.fortnightlySavings ?? DEFAULT_SAVINGS); setPayday.value=data.settings.nextPayday||'';
+    setCash.value=data.settings.cashAvailable||0; setIncome.value=data.settings.fortnightlyIncome||0; setSavings.value=(data.settings.fortnightlySavings ?? DEFAULT_SAVINGS); setPayday.value=data.settings.nextPayday||''; setLowBalance.value=data.settings.lowBalanceThreshold||0;
   } catch(e) {
     console.error(e);
     alert('There was a dashboard error: '+e.message);
@@ -1812,6 +1813,7 @@ function saveProfileSettings(){
   data.settings.cashAvailable=+setCash.value||0;
   data.settings.fortnightlyIncome=+setIncome.value||0;
   data.settings.fortnightlySavings=+setSavings.value||0;
+  data.settings.lowBalanceThreshold=Math.max(0,+setLowBalance.value||0);
   data.settings.planSet=true;
   syncAutoPayday(); save();
 }
@@ -2838,11 +2840,16 @@ function wireBillAlertTestButton(){
       const r=res.data||{};
       if(msg){
         msg.style.display='block';
-        msg.textContent = r.sent
-          ? `Sent: ${money(r.dueTotal)} due soon, only ${money(r.cash)} available.`
-          : r.reason==='covered'
-            ? `No alert needed — ${money(r.dueTotal||0)} due soon is covered by ${money(r.cash||0)} available.`
+        if(r.sent){
+          const reasons=[];
+          if(r.billShortfall) reasons.push(`${money(r.dueTotal)} due soon`);
+          if(r.lowBalance) reasons.push('balance below your threshold');
+          msg.textContent = `Sent: ${reasons.join(' & ')}, only ${money(r.cash)} available.`;
+        } else {
+          msg.textContent = r.reason==='covered'
+            ? `No alert needed — ${money(r.dueTotal||0)} due soon and ${money(r.cash||0)} available is above your threshold.`
             : `No alert sent (${r.reason||'unknown reason'}).`;
+        }
       }
     }catch(e){
       console.error('checkBillAlertsNow failed', e);

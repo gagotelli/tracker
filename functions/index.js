@@ -307,13 +307,19 @@ async function checkBillAlerts(uid, psKey, resendKey, force) {
     .filter((b) => b.next <= windowEnd)
     .sort((a, b) => a.next - b.next);
   const dueTotal = dueSoon.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+  const billShortfall = dueSoon.length > 0 && dueTotal > cash;
 
-  if (!dueSoon.length || dueTotal <= cash) {
+  // 0 (the field's default/unset value) means "off" - never fires on its
+  // own, only the bill-shortfall check above applies in that case.
+  const lowBalanceThreshold = Number(profile.settings && profile.settings.lowBalanceThreshold) || 0;
+  const lowBalance = lowBalanceThreshold > 0 && cash < lowBalanceThreshold;
+
+  if (!billShortfall && !lowBalance) {
     return { sent: false, reason: "covered", dueTotal: round2(dueTotal), cash: round2(cash) };
   }
 
   // One email per calendar day even though the schedule could in principle
-  // fire more than once while the shortfall persists - force skips this,
+  // fire more than once while a shortfall persists - force skips this,
   // for the manual "send test alert" button.
   const alertDoc = db.doc(`trackers/${uid}/meta/billAlerts`);
   const todayIso = iso(today);
@@ -324,12 +330,25 @@ async function checkBillAlerts(uid, psKey, resendKey, force) {
     }
   }
 
-  const lines = dueSoon
-    .map((b) => `- ${b.description}: $${(Number(b.amount) || 0).toFixed(2)}, due ${iso(b.next)}`)
-    .join("\n");
-  const text =
-    `Bills due in the next ${ALERT_WINDOW_DAYS} days total $${dueTotal.toFixed(2)}, ` +
-    `but your Personal/Bills accounts only have $${cash.toFixed(2)} available.\n\n${lines}`;
+  const sections = [];
+  const subjectParts = [];
+  if (billShortfall) {
+    const lines = dueSoon
+      .map((b) => `- ${b.description}: $${(Number(b.amount) || 0).toFixed(2)}, due ${iso(b.next)}`)
+      .join("\n");
+    sections.push(
+      `Bills due in the next ${ALERT_WINDOW_DAYS} days total $${dueTotal.toFixed(2)}, ` +
+        `but your Personal/Bills accounts only have $${cash.toFixed(2)} available.\n\n${lines}`
+    );
+    subjectParts.push(`$${dueTotal.toFixed(2)} due soon`);
+  }
+  if (lowBalance) {
+    sections.push(
+      `Your Personal/Bills balance is $${cash.toFixed(2)}, below your alert threshold of ` +
+        `$${lowBalanceThreshold.toFixed(2)} (set under Your Plan).`
+    );
+    subjectParts.push(`balance below $${lowBalanceThreshold.toFixed(2)}`);
+  }
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -337,8 +356,8 @@ async function checkBillAlerts(uid, psKey, resendKey, force) {
     body: JSON.stringify({
       from: "Finance Tracker <onboarding@resend.dev>",
       to: ["gagotelli@gmail.com"],
-      subject: `Bill alert: $${dueTotal.toFixed(2)} due soon, only $${cash.toFixed(2)} available`,
-      text,
+      subject: `Money alert: ${subjectParts.join(" & ")} ($${cash.toFixed(2)} available)`,
+      text: sections.join("\n\n---\n\n"),
     }),
   });
   if (!res.ok) {
@@ -346,7 +365,7 @@ async function checkBillAlerts(uid, psKey, resendKey, force) {
   }
 
   await alertDoc.set({ lastSent: todayIso }, { merge: true });
-  return { sent: true, dueTotal: round2(dueTotal), cash: round2(cash) };
+  return { sent: true, billShortfall, lowBalance, dueTotal: round2(dueTotal), cash: round2(cash) };
 }
 
 exports.checkBillAlertsScheduled = onSchedule(
