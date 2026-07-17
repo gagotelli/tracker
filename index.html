@@ -1747,16 +1747,21 @@ function render(){
   }
 }
 
-// Fixed bills are automatic direct debits, so once a due date is in the
-// past it's treated as paid: the linked balance drops and the bill rolls
-// forward to its next cycle. Runs every render, no manual tick needed.
+// Fixed bills are automatic direct debits, so once a due date has arrived
+// it's treated as paid: the linked balance drops and the bill rolls forward
+// to its next cycle. Uses <= (due today counts), not < (due today doesn't
+// roll until tomorrow) - a same-day bill's live account balance already
+// reflects the debit the moment it clears, so leaving it in the "still
+// owed" window for the rest of that day double-counted it: once via the
+// already-reduced balance, again via still being summed into committed
+// fortnight spend. Runs every render, no manual tick needed.
 function autoRollBills(){
   let changed=false;
   const t=today();
   data.bills.forEach(b=>{
     let d=parseDate(b.date);
     let guard=0, rolled=false;
-    while(d<t && guard<300){
+    while(d<=t && guard<300){
       applyPaymentToBalances(b);
       d=addCycle(d,b.repeat);
       guard++; rolled=true;
