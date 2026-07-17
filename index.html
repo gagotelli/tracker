@@ -807,8 +807,10 @@ const firebaseConfig = {
 
     <div class="card" style="margin-top:16px">
       <h2 class="section-title">DATA</h2>
-      <div class="actions">
-        <button class="btn secondary" onclick="downloadBackup()">Download backup</button>
+      <p class="fnHelp">Backup includes your settings, bills, cards and loans plus your synced transaction and net worth history - the parts you can't just re-type back in.</p>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn secondary" onclick="downloadBackup()">Download backup (JSON)</button>
+        <button class="btn secondary" onclick="downloadTransactionsCsv()">Download transactions (CSV)</button>
         <button class="btn danger" onclick="resetCurrentProfile()">Clear all data</button>
       </div>
     </div>
@@ -1491,6 +1493,45 @@ function renderFortnight(){
 let payoffStrategy='snowball';
 function setPayoffStrategy(s){ if(s===payoffStrategy) return; payoffStrategy=s; render(); }
 
+// This debt's periodic repayment, raw (no cadence conversion) - matches
+// getFortnight()'s cardRows/loan handling exactly, which also just takes
+// the raw bill/loan amount as-is regardless of its repeat cycle. Keeping
+// the same simplification here means this number never disagrees with
+// the "Debt free (est.)" figure right above it on the same page.
+function repaymentFor(debt){
+  const loan=(data.loans||[]).find(l=>normalise(l.name)===normalise(debt.name));
+  if(loan) return Number(loan.paymentAmount)||0;
+  const account=data.accounts.find(a=>normalise(a.name)===normalise(debt.name)||paymentMatches(debt.name,a.name));
+  if(account){
+    const bill=data.bills.find(b=>paymentMatches(b.description,account.name));
+    return (bill?Number(bill.amount)||0:0) + (Number(account.extra)||0);
+  }
+  return 0;
+}
+
+// Set by the Total Debt render whenever the payoff-order list changes, so
+// the "what if I paid extra" input can react instantly (updateExtraPayoff
+// only touches its own result text, not the whole panel - regenerating
+// the panel's innerHTML on every keystroke would blow away the input's
+// focus and cursor position while typing).
+let topPriorityDebt=null;
+function updateExtraPayoff(){
+  const el=document.getElementById('extraPayoffResult');
+  const input=document.getElementById('extraPayoffInput');
+  if(!el || !input || !topPriorityDebt) return;
+  const {name, balance, rate} = topPriorityDebt;
+  if(rate<=0){ el.textContent=`No repayment amount set for ${name} yet — add one under Cards or Loans first.`; return; }
+  const extra=Math.max(0, +input.value || 0);
+  const currentFns=Math.ceil(balance/rate);
+  const fnWord=n=>`${n} fortnight${n===1?'':'s'}`;
+  if(extra<=0){ el.textContent=`${name} clears in about ${fnWord(currentFns)} at the current repayment.`; return; }
+  const newFns=Math.ceil(balance/(rate+extra));
+  const saved=currentFns-newFns;
+  el.textContent = saved>0
+    ? `${name} clears in about ${fnWord(newFns)} instead of ${fnWord(currentFns)} — ${fnWord(saved)} sooner.`
+    : `${name} clears in about ${fnWord(newFns)} — already about as fast as extra repayments can take it.`;
+}
+
 function render(){
   try{
     renderBank();
@@ -1596,6 +1637,7 @@ function render(){
 
       if(!total){
         panel.innerHTML='<div class="fnSub">No debts recorded. Add one under Setup.</div>';
+        topPriorityDebt=null;
         return;
       }
 
@@ -1712,6 +1754,7 @@ function render(){
           const ordered=debts.map(d=>({...d,rate:rateFor(d)})).sort((a,b)=>
             strategy==='avalanche' ? (b.rate-a.rate || b.amount-a.amount) : (a.amount-b.amount)
           );
+          topPriorityDebt = ordered[0] ? {name:ordered[0].name, balance:ordered[0].amount, rate:repaymentFor(ordered[0])} : null;
           return `
         <div class="fnGroup">
           <div class="fnGroupHead">
@@ -1730,9 +1773,20 @@ function render(){
               ? 'Avalanche: highest interest rate first &mdash; mathematically the least interest paid overall.'
               : 'Snowball: smallest balance first &mdash; clears an account fastest for momentum, not the cheapest order.')
             : 'Showing snowball order (smallest balance first). Add an interest rate under Cards or Loans to unlock avalanche ordering.'}</p>
-        </div>`;
+        </div>
+
+        ${topPriorityDebt ? `
+        <div class="fnGroup">
+          <div class="fnGroupHead"><span>What if I paid extra?</span></div>
+          <label style="display:block;margin-top:10px">
+            <span class="fnHint" style="display:block;margin-bottom:6px">Extra per fortnight toward ${escHtml(topPriorityDebt.name)} (your #1 priority above)</span>
+            <input id="extraPayoffInput" type="number" step="0.01" min="0" placeholder="0.00" oninput="updateExtraPayoff()">
+          </label>
+          <p id="extraPayoffResult" class="fnSub" style="margin-top:10px"></p>
+        </div>` : ''}`;
         })()}`;
     })();
+    updateExtraPayoff();
 
     if(document.getElementById('profileCardsTable')){
       profileCardsTable.innerHTML=data.accounts.map((a,i)=>{
@@ -2025,7 +2079,46 @@ function resetCurrentProfile(){
   store.profiles[name]=data;
   saveStore(); render();
 }
-function downloadBackup(){ const blob=new Blob([JSON.stringify(store,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='finance-tracker-all-profiles-backup.json'; a.click(); }
+// Full backup, not just the manually-entered store: transaction history
+// and net worth history live in their own Firestore subcollections (not
+// part of `store`), and they're the pieces you can't just re-type back in
+// if this account or project ever went away - settings/bills/cards/loans
+// are annoying to redo, but a year of net worth trend is gone for good.
+function downloadBackup(){
+  const payload={
+    exportedAt: new Date().toISOString(),
+    store,
+    transactions: Array.isArray(spendHistory) ? spendHistory : [],
+    netWorthHistory: Array.isArray(netWorthHistory) ? netWorthHistory : [],
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='finance-tracker-backup-'+iso(today())+'.json';
+  a.click();
+}
+
+// Plain CSV for whoever just wants the transaction list in a spreadsheet
+// rather than the full JSON backup above.
+function downloadTransactionsCsv(){
+  if(!Array.isArray(spendHistory) || !spendHistory.length){
+    alert('No transaction history loaded yet.');
+    return;
+  }
+  const bankIds=new Set((bank && Array.isArray(bank.accounts)) ? bank.accounts.map(a=>a.id) : []);
+  const latIds=new Set((latitude && Array.isArray(latitude.accounts)) ? latitude.accounts.map(a=>a.id) : []);
+  const esc=v=>{ const s=String(v==null?'':v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const lines=[['date','account','payee','amount','category','id'].join(',')];
+  spendHistory.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(t=>{
+    const account = bankIds.has(t.accountId) ? 'CommBank' : latIds.has(t.accountId) ? 'Latitude' : 'Other';
+    lines.push([esc(t.date), esc(account), esc(t.payee), esc(t.amount), esc(t.category||''), esc(t.id)].join(','));
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='finance-tracker-transactions-'+iso(today())+'.csv';
+  a.click();
+}
 
 applyTheme();
 // In cloud mode nothing renders until the Firestore snapshot arrives after
