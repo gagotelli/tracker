@@ -207,7 +207,12 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .chartBig{font-family:var(--mono);font-size:19px;font-weight:800}
 .chartSub{font-size:12px;color:var(--muted)}
 .chartHint{margin-left:auto;font-size:11px;letter-spacing:.02em;color:var(--muted)}
-@media(max-width:520px){.chartHint{margin-left:0;flex-basis:100%;margin-top:6px}}
+@media(max-width:520px){
+  .chartHint{margin-left:0;flex-basis:100%;margin-top:6px}
+  .chartBig{font-size:15px}
+  .chartStat{padding-right:12px;gap:5px}
+  .chartLegend{gap:4px 8px}
+}
 .forecastBand{fill:#f5c94a;fill-opacity:.12}
 
 /* ===== THIS FORTNIGHT: mobile fit =====
@@ -2349,13 +2354,18 @@ function renderSpendChart(){
   }).join('');
 
   // Which week is under inspection: whatever was last tapped, falling back
-  // to the busiest real week (highest single income or expense point) so
-  // there's always something useful shown by default. Only real weeks are
-  // selectable - forecast weeks have no transactions to show a breakdown
-  // of. Every real week is tappable via an invisible full-height hit zone
-  // per week - small dots alone are too fiddly to tap accurately on a phone.
+  // to the current week (the most recent real one) rather than the busiest
+  // week - opening the app should show where you stand right now, not
+  // whichever past week happened to spike highest. "peak" is kept
+  // separately purely to label the chart's tallest bars and to flag
+  // "busiest week" in the summary when that happens to also be the
+  // current week. Only real weeks are selectable - forecast weeks have no
+  // transactions to show a breakdown of. Every real week is tappable via
+  // an invisible full-height hit zone per week - small dots alone are too
+  // fiddly to tap accurately on a phone.
   const peak=realRows.slice().sort((a,b)=>Math.max(b.expense,b.income)-Math.max(a.expense,a.income))[0];
-  const active=(selectedSpendWeek && realRows.find(r=>r.wk===selectedSpendWeek)) || peak;
+  const currentWeek=realRows[realRows.length-1];
+  const active=(selectedSpendWeek && realRows.find(r=>r.wk===selectedSpendWeek)) || currentWeek;
   const activeIdx=rows.findIndex(r=>r.wk===active.wk);
 
   const bandStep=n>1 ? xAt(1)-xAt(0) : plotW;
