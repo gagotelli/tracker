@@ -205,7 +205,7 @@ async function syncUser(uid, key) {
 
 exports.syncBankScheduled = onSchedule(
   {
-    schedule: "every 4 hours",
+    schedule: "every 1 hours",
     timeZone: "Australia/Sydney",
     region: REGION,
     secrets: [PS_KEY, OWNER_UID],
