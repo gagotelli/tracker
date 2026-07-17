@@ -273,7 +273,17 @@ function nextDueDate(bill, from) {
   return d;
 }
 
-async function checkBillAlerts(uid, resendKey, force) {
+async function checkBillAlerts(uid, psKey, resendKey, force) {
+  // Refresh from PocketSmith first rather than trusting whatever the last
+  // 4-hourly syncBankScheduled run left behind - the entire point of this
+  // check is catching a low balance before it bites, so it should always
+  // be judged against balances as fresh as right now, not up to 4 hours old.
+  try {
+    await syncUser(uid, psKey);
+  } catch (e) {
+    console.error("bill alert: pre-check PocketSmith sync failed, using last-known balances", e);
+  }
+
   const snap = await db.doc(`trackers/${uid}`).get();
   if (!snap.exists) return { sent: false, reason: "no tracker doc" };
   const trackerData = snap.data();
@@ -344,10 +354,10 @@ exports.checkBillAlertsScheduled = onSchedule(
     schedule: "every day 07:00",
     timeZone: "Australia/Sydney",
     region: REGION,
-    secrets: [OWNER_UID, RESEND_API_KEY],
+    secrets: [PS_KEY, OWNER_UID, RESEND_API_KEY],
   },
   async () => {
-    const r = await checkBillAlerts(OWNER_UID.value(), RESEND_API_KEY.value(), false);
+    const r = await checkBillAlerts(OWNER_UID.value(), PS_KEY.value(), RESEND_API_KEY.value(), false);
     console.log("bill alert check", r);
   }
 );
@@ -358,12 +368,12 @@ exports.checkBillAlertsScheduled = onSchedule(
 // really is due soon and cash really doesn't cover it - it tests the real
 // condition, not a fake one.
 exports.checkBillAlertsNow = onCall(
-  { region: REGION, secrets: [OWNER_UID, RESEND_API_KEY] },
+  { region: REGION, secrets: [PS_KEY, OWNER_UID, RESEND_API_KEY] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign in first.");
     if (request.auth.uid !== OWNER_UID.value()) {
       throw new HttpsError("permission-denied", "Not your tracker.");
     }
-    return await checkBillAlerts(request.auth.uid, RESEND_API_KEY.value(), true);
+    return await checkBillAlerts(request.auth.uid, PS_KEY.value(), RESEND_API_KEY.value(), true);
   }
 );
