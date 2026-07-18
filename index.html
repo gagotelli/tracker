@@ -1336,7 +1336,13 @@ function getFortnight(){
   // Salary alone can't tell you what you've already spent this cycle; the
   // account balance can. Salary itself is still editable under Your Plan.
   const safe=cash-committed;
-  const daily=safe/14;
+  // Days actually left until payday, not a flat 14 - early in the cycle
+  // that's close to 14 anyway, but late in the cycle (payday in 5 days,
+  // say) dividing the same money by a full fortnight understated the real
+  // daily budget by nearly 3x. Clamped to at least 1 so this never divides
+  // by zero on payday itself.
+  const daysLeft=Math.max(1,daysUntil(payday));
+  const daily=safe/daysLeft;
 
   // coverage: anything landing before payday must come out of cash on hand
   const dueBeforePayday=data.bills
@@ -1345,7 +1351,7 @@ function getFortnight(){
 
   return {payday,following,fixed,cardRows,salary,cash,savings,availableBalance,
           personalSynced:safeCashAccts.length>0,
-          fixedTotal,cardsPayTotal,committed,safe,daily,dueBeforePayday};
+          fixedTotal,cardsPayTotal,committed,safe,daily,daysLeft,dueBeforePayday};
 }
 
 /* PocketSmith reports liabilities as negative. Render them the way the bank
@@ -1439,7 +1445,7 @@ function renderFortnight(){
   set('fnSafe',money(f.safe));
   document.getElementById('fnSafe').className='fnBig'+(f.safe<0?' danger':'');
   set('fnDaily',money(Math.max(0,f.daily)));
-  set('fnDays','14');
+  set('fnDays',String(f.daysLeft));
   set('fnPayday',niceDate(f.payday));
   set('fnFollowing',niceDate(f.following));
 
