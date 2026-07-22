@@ -1198,8 +1198,17 @@ function syncDebtFor(name,amount,color,type){
   return debt;
 }
 
+// Prefers the live PocketSmith balance over the manually-entered one, same
+// as the CARDS tile and the net worth calc already do - this was the one
+// place still reading the raw manual a.balance unconditionally, which is
+// why Total Debt, the avalanche/snowball order and "what if I paid extra"
+// could all disagree with what the card itself displayed once it synced.
 function syncFigures(){
-  data.accounts.forEach(a=>{ a.balance=Number(a.balance)||0; a.limit=Number(a.limit)||0; a.min=Number(a.min)||0; a.available=Math.max(0,a.limit-a.balance); });
+  data.accounts.forEach(a=>{
+    const live=liveCardAccount(a.name);
+    a.balance = live!=null ? Math.abs(Number(live.balance)||0) : (Number(a.balance)||0);
+    a.limit=Number(a.limit)||0; a.min=Number(a.min)||0; a.available=Math.max(0,a.limit-a.balance);
+  });
   data.accounts.forEach(a=>syncDebtFor(a.name, a.balance, a.color, 'Credit Card'));
 
   if(!Array.isArray(data.loans)) data.loans=[];
@@ -1269,7 +1278,19 @@ const DEFAULT_SAVINGS=270;
 // from this, so the numbers can never disagree with each other again.
 function getFortnight(){
   const payday=parseDate(data.settings.nextPayday||iso(today()));
-  const cycleStart=new Date(payday);
+  // The fortnight being budgeted for should always be a full window still
+  // ahead of you. `data.settings.nextPayday` legitimately still equals
+  // today ON payday itself (syncAutoPayday only rolls it forward the
+  // following day, and the "Payday in N days / Payday today" badge below
+  // wants exactly that so it can say "today"). But budgeting off that raw
+  // value on payday morning meant "This Fortnight" was still the closing
+  // 14 days ending today - stale bills already rolled off, 0-1 days left,
+  // pre-salary balance - instead of the fresh cycle that just started.
+  // cycleEnd rolls forward to the payday AFTER it once payday has
+  // actually arrived, so the window becomes [today, +14] rather than
+  // [today-14, today] the moment you reach it.
+  const cycleEnd = payday<=today() ? addCycle(payday,'Fortnightly') : payday;
+  const cycleStart=new Date(cycleEnd);
   cycleStart.setDate(cycleStart.getDate()-14);
   const following=new Date(payday);
   following.setDate(following.getDate()+14);
@@ -1278,7 +1299,7 @@ function getFortnight(){
   // up to your next one. That's what should be listed under Bills and fixed
   // payments, so the dates line up with the Payments tab instead of jumping
   // ahead to the cycle after next.
-  const items=data.bills.flatMap(b=>dueInstancesInWindow(b,cycleStart,payday)).sort((a,b)=>a.next-b.next);
+  const items=data.bills.flatMap(b=>dueInstancesInWindow(b,cycleStart,cycleEnd)).sort((a,b)=>a.next-b.next);
 
   // Everything due this cycle is committed, rent, subscriptions, the loan,
   // whatever's on the Payments tab. If a card repayment is ever tracked as
@@ -1341,12 +1362,13 @@ function getFortnight(){
   // say) dividing the same money by a full fortnight understated the real
   // daily budget by nearly 3x. Clamped to at least 1 so this never divides
   // by zero on payday itself.
-  const daysLeft=Math.max(1,daysUntil(payday));
+  const daysLeft=Math.max(1,daysUntil(cycleEnd));
   const daily=safe/daysLeft;
 
-  // coverage: anything landing before payday must come out of cash on hand
+  // coverage: anything landing before the next payday must come out of
+  // cash on hand
   const dueBeforePayday=data.bills
-    .flatMap(b=>dueInstancesInWindow(b,today(),payday))
+    .flatMap(b=>dueInstancesInWindow(b,today(),cycleEnd))
     .reduce((s,b)=>s+Number(b.amount||0),0);
 
   return {payday,following,fixed,cardRows,salary,cash,savings,availableBalance,
@@ -1564,9 +1586,10 @@ function render(){
     accounts.innerHTML=data.accounts.map(a=>{
       const live=liveCardAccount(a.name);
       const balance=live!=null?Math.abs(Number(live.balance)||0):a.balance;
-      const available=Math.max(0,a.limit-balance);
-      const u=a.limit?Math.min(100,balance/a.limit*100):0;
-      const klass=u>=90?'danger':u>=70?'warn':'success';
+      const hasLimit=Number(a.limit)>0;
+      const available=hasLimit?Math.max(0,a.limit-balance):null;
+      const u=hasLimit?Math.min(100,balance/a.limit*100):0;
+      const klass=!hasLimit?'':u>=90?'danger':u>=70?'warn':'success';
       const dueBill=data.bills.find(b=>paymentMatches(b.description,a.name));
       // live.dueDate (ISO string) is a placeholder field name for whenever
       // syncBankNow/syncLatitudeNow start writing a real due date pulled from
@@ -1580,16 +1603,18 @@ function render(){
       const subgrid=`<div class="subgrid" style="margin-top:12px;grid-template-columns:1fr">
           <div><div class="label">Payment due</div><b class="danger">${escHtml(dueDate)}</b></div>
         </div>`;
-      const meterColor=u>=90?'var(--red)':u>=70?'#b77900':'var(--green)';
+      const meterColor=!hasLimit?'var(--muted)':u>=90?'var(--red)':u>=70?'#b77900':'var(--green)';
       return `<div class="card span6">
         <div class="acctHead"><div class="logo">${cardIconSvg(a.color||defaultCardColor(a.name))}</div><div class="name">${escHtml(a.name)}</div></div>
         <div class="cardMetricRow" style="margin-top:10px">
           <div>
             <div class="cardBal">${money(balance)}</div>
-            <div class="cardBalLbl">owing of ${money(a.limit)} limit${live!=null?' &middot; synced from PocketSmith':''}</div>
-            <div class="cardUtil" style="margin-top:8px"><b class="${klass}">${u.toFixed(1)}%</b> used<span>${money(available)} available</span></div>
+            <div class="cardBalLbl">owing${hasLimit?' of '+money(a.limit)+' limit':''}${live!=null?' &middot; synced from PocketSmith':''}</div>
+            <div class="cardUtil" style="margin-top:8px">${hasLimit
+              ? `<b class="${klass}">${u.toFixed(1)}%</b> used<span>${money(available)} available</span>`
+              : `<span>No credit limit set &mdash; add one under Cards to track utilisation</span>`}</div>
           </div>
-          ${arcMeter(u,meterColor,64)}
+          ${hasLimit?arcMeter(u,meterColor,64):''}
         </div>
         ${subgrid}
       </div>`;
