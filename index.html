@@ -201,11 +201,9 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .debtRow span{display:flex;align-items:center}
 .debtLegend .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;flex-shrink:0}
 .debtLegend b{font-family:var(--mono);color:var(--text);margin-left:6px;font-weight:700}
-.debtLegend em{font-style:normal;font-family:var(--mono);margin-left:6px;color:var(--muted)}
 .debtRowSub{margin:3px 0 0 15px}
 @media(max-width:640px){
   .debtRow span b{margin-left:auto}
-  .debtLegend em{min-width:34px;text-align:right}
 }
 
 .spendSvg{width:100%;height:auto;display:block;overflow:visible}
@@ -1802,10 +1800,10 @@ function render(){
           ${debts.map((d,i)=>{
             const p=paidInfo[i];
             const sub=p.tracked
-              ? `${money(p.paid)} paid ${p.label} of ${money(p.of)} &middot; ${p.pct.toFixed(0)}% paid off`
-              : 'Paid-off tracking not set for this account';
+              ? `${pct[i]}% of total debt &middot; ${money(p.paid)} paid ${p.label} of ${money(p.of)} &middot; ${p.pct.toFixed(0)}% paid off`
+              : `${pct[i]}% of total debt &middot; Paid-off tracking not set for this account`;
             return `<div class="debtRow">
-              <span><i class="dot" style="background:${d.color||'var(--muted)'}"></i>${escHtml(d.name)} <b>${money(d.amount)}</b><em>${pct[i]}%</em></span>
+              <span><i class="dot" style="background:${d.color||'var(--muted)'}"></i>${escHtml(d.name)} <b>${money(d.amount)}</b></span>
               <div class="fnSub debtRowSub">${sub}</div>
             </div>`;
           }).join('')}
