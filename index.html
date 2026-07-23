@@ -162,13 +162,26 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .fnHead{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 .fnBadge{font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:var(--green);color:#fff;font-weight:600}
 .fnBadge.idle{background:transparent;color:var(--muted);border:1px solid var(--border)}
-.fnHero{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
 .fnBig{font-family:var(--mono);font-weight:700;font-size:34px;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
 .fnBig.danger{color:var(--red)}
 .fnSub{font-size:13px;color:var(--muted);margin-top:6px}
 .fnSub b{font-family:var(--mono);color:var(--text)}
-.fnDates{text-align:right}
-.fnDates b{font-family:var(--mono);font-size:15px}
+
+.heroPanel{background:linear-gradient(155deg,var(--accent),color-mix(in srgb,var(--accent) 80%,#000 10%));border-radius:14px;padding:22px 24px;color:var(--accentText);position:relative;overflow:hidden;margin-bottom:16px}
+.heroPanel::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 140% at 100% 0%,rgba(255,255,255,.10),transparent 55%);pointer-events:none}
+.heroPanel.danger{background:linear-gradient(155deg,var(--red),color-mix(in srgb,var(--red) 80%,#000 12%))}
+.heroPanel .label{color:rgba(255,255,255,.72);position:relative}
+.heroPanel .fnBig{position:relative;font-size:46px;margin-top:8px}
+.heroPanel .fnSub{position:relative;color:rgba(255,255,255,.78)}
+.heroPanel .fnSub b{color:#fff}
+.heroProgress{height:6px;border-radius:999px;background:rgba(255,255,255,.22);margin-top:16px;overflow:hidden;position:relative}
+.heroProgress b{display:block;height:100%;background:#fff;border-radius:999px;transition:width .3s ease}
+
+.fnSecondary{display:flex;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.fnSecondary>div{flex:1 1 140px;min-width:140px}
+.fnSecondary>div:last-child{text-align:right}
+.fnSecondary .value{font-size:19px;font-weight:800;margin-top:6px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+
 .fnGroup{margin-top:18px}
 .fnGroupHead{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:600;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .fnGroupHead b{font-family:var(--mono);color:var(--muted);font-weight:400}
@@ -246,9 +259,10 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 
 @media(max-width:900px){
   .fnCard{padding:16px 14px}
-  .fnHero{flex-direction:column;gap:14px;align-items:stretch}
-  .fnDates{text-align:left}
+  .fnSecondary{flex-direction:column;gap:14px}
+  .fnSecondary>div:last-child{text-align:left}
   .fnBig{font-size:30px}
+  .heroPanel .fnBig{font-size:36px}
   .fnCard .table{font-size:13px}
   .fnCard .table td,.fnCard .table th{padding:10px 6px}
   .fnMinMobile{display:block;font-size:11px;color:var(--muted);margin-top:2px}
@@ -258,10 +272,10 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 
 @media(max-width:420px){
   .fnBig{font-size:26px}
+  .heroPanel .fnBig{font-size:32px}
   .fnCard .table{font-size:12px}
   .fnCard .table td,.fnCard .table th{padding:9px 4px}
 }
-@media(max-width:640px){ .fnDates{text-align:left} .fnBig{font-size:28px} }
 .paydayMini{background:var(--soft);border:1px solid var(--border);border-radius:16px;padding:22px;text-align:center}
 .paydayMini .payLabel{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .paydayMini .payValue{margin-top:10px;font-size:28px;font-weight:800;color:var(--text);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
@@ -550,20 +564,22 @@ const firebaseConfig = {
           <span class="fnBadge" id="fnPaydayBadge"></span>
         </div>
 
-        <div class="fnHero">
-          <div>
-            <div class="label">Safe to spend</div>
-            <div class="fnBig" id="fnSafe">$0.00</div>
-            <div class="fnSub"><b id="fnDaily">$0.00</b> a day for <span id="fnDays">14</span> days</div>
-          </div>
+        <div class="heroPanel" id="fnHeroPanel">
+          <div class="label">Safe to spend</div>
+          <div class="fnBig" id="fnSafe">$0.00</div>
+          <div class="fnSub"><b id="fnDaily">$0.00</b> a day for <span id="fnDays">14</span> days</div>
+          <div class="heroProgress" id="fnProgressTrack"><b id="fnProgressFill" style="width:0%"></b></div>
+        </div>
+
+        <div class="fnSecondary">
           <div>
             <div class="label">Available balance</div>
             <div class="value" id="fnAvailable">$0.00</div>
             <div class="fnSub" id="fnAvailableSub">Personal + cards</div>
           </div>
-          <div class="fnDates">
+          <div>
             <div class="label">Payday</div>
-            <b id="fnPayday"></b>
+            <div class="value" id="fnPayday"></div>
             <div class="fnSub">then <span id="fnFollowing"></span></div>
           </div>
         </div>
@@ -1509,11 +1525,18 @@ function renderFortnight(){
   const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
 
   set('fnSafe',money(f.safe));
-  document.getElementById('fnSafe').className='fnBig'+(f.safe<0?' danger':'');
+  const heroPanel=document.getElementById('fnHeroPanel');
+  if(heroPanel) heroPanel.className='heroPanel'+(f.safe<0?' danger':'');
   set('fnDaily',money(Math.max(0,f.daily)));
   set('fnDays',String(f.daysLeft));
   set('fnPayday',niceDate(f.payday));
   set('fnFollowing',niceDate(f.following));
+
+  const progressPct=Math.max(0,Math.min(100,(14-f.daysLeft)/14*100));
+  const progressFill=document.getElementById('fnProgressFill');
+  if(progressFill) progressFill.style.width=progressPct.toFixed(0)+'%';
+  const progressTrack=document.getElementById('fnProgressTrack');
+  if(progressTrack) progressTrack.title=progressPct.toFixed(0)+'% through this fortnight';
 
   set('fnAvailable',money(f.availableBalance));
   set('fnAvailableSub', f.personalSynced ? 'Everyday accounts + cards' : 'Everyday accounts (not synced) + cards');
