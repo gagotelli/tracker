@@ -209,6 +209,18 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .spendSvg{width:100%;height:auto;display:block;overflow:visible}
 .chartAxis{font-family:var(--mono);font-size:10px;fill:var(--muted)}
 .chartLabel{font-family:var(--mono);font-size:11px;font-weight:700}
+/* The chart's SVG viewBox is a fixed 760x280 regardless of screen size, so
+   its text scales down with the container - on a ~340px-wide phone that's
+   roughly a 0.45x shrink, taking 10-11px text down to an unreadable ~5px.
+   Desktop cards are usually close to or wider than 760px (no meaningful
+   shrink, sometimes a slight upscale), so this only needs to kick in on
+   narrow screens. The matching pill-background resize for peak/active
+   value labels lives in JS (renderSpendChart's `mobile` flag), since
+   those have a background shape sized in JS to fit the text. */
+@media(max-width:640px){
+  .chartAxis{font-size:20px}
+  .chartLabel{font-size:20px}
+}
 .chartLegend{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 10px;margin-top:16px}
 .chartStat{display:flex;align-items:baseline;gap:7px;padding-right:18px}
 .chartBig{font-family:var(--mono);font-size:19px;font-weight:800}
@@ -2548,24 +2560,22 @@ function renderSpendChart(){
   // whichever past week happened to spike highest. "peak" is kept
   // separately purely to label the chart's tallest bars and to flag
   // "busiest week" in the summary when that happens to also be the
-  // current week. Only real weeks are selectable - forecast weeks have no
-  // transactions to show a breakdown of. Every real week is tappable via
-  // an invisible full-height hit zone per week - small dots alone are too
-  // fiddly to tap accurately on a phone.
+  // current week. Forecast weeks are tappable too, same as real ones -
+  // they show a projected breakdown (scheduled bills/salary) instead of
+  // real transactions below, rather than the dots just doing nothing.
   const peak=realRows.slice().sort((a,b)=>Math.max(b.expense,b.income)-Math.max(a.expense,a.income))[0];
   const currentWeek=realRows[realRows.length-1];
-  const active=(selectedSpendWeek && realRows.find(r=>r.wk===selectedSpendWeek)) || currentWeek;
+  const active=(selectedSpendWeek && rows.find(r=>r.wk===selectedSpendWeek)) || currentWeek;
   const activeIdx=rows.findIndex(r=>r.wk===active.wk);
 
   const bandStep=n>1 ? xAt(1)-xAt(0) : plotW;
   const hitZones=rows.map((r,i)=>
-    r.forecast ? '' : `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="0" width="${bandStep.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
+    `<rect x="${(xAt(i)-bandStep/2).toFixed(1)}" y="0" width="${bandStep.toFixed(1)}" height="${H}" fill="transparent" style="cursor:pointer" onclick="selectSpendWeek('${r.wk}')"/>`
   ).join('');
 
   // "Today" divider + a shaded band over the forecast weeks, same idea
   // Copilot's cash flow view uses to separate what happened from what's
-  // scheduled. Forecast bars render at a fixed dim opacity regardless of
-  // tap state, since they're not selectable.
+  // scheduled.
   let todayMarker='';
   if(forecastRows.length){
     const boundaryX=xAt(lastRealIdx)+bandStep/2;
@@ -2583,7 +2593,7 @@ function renderSpendChart(){
   const barWidth=Math.max(4,Math.min(24,bandStep*0.42));
   const bars=rows.map((r,i)=>{
     const cx=xAt(i);
-    const op=r.forecast?.35:(r.wk===active.wk?1:.55);
+    const op=r.wk===active.wk ? 1 : (r.forecast?.35:.55);
     let g='';
     if(r.income>0) g+=`<path d="${barPath(cx,baseY,yIncome(r.income),barWidth,4)}" fill="var(--green)" fill-opacity="${op}"/>`;
     if(r.expense>0) g+=`<path d="${barPath(cx,baseY,yExpense(r.expense),barWidth,4)}" fill="var(--muted)" fill-opacity="${op}"/>`;
@@ -2606,16 +2616,21 @@ function renderSpendChart(){
   // those two peaks. Clamped inside the plot so nothing clips off the edge.
   const topLabel=`<text x="${padL}" y="${(padT+4).toFixed(1)}" text-anchor="start" class="chartAxis">${money(scale)}</text>`;
   const zeroLabel=`<text x="${(W-padR).toFixed(1)}" y="${(baseY+4).toFixed(1)}" text-anchor="end" class="chartAxis">0</text>`;
+  // The pill's background rect is sized in JS (not CSS), so it has to grow
+  // to match .chartLabel's mobile font-size bump above - otherwise the
+  // larger mobile text would overflow the smaller desktop-sized pill.
+  const mobile=window.innerWidth<640;
+  const pillCharW=mobile?12:6.4, pillPadX=mobile?22:16, pillH=mobile?30:20, pillOffset=mobile?22:16;
   const pillLabel=(i,v,y,color,side)=>{
     if(v<=0) return '';
     const text=money(v);
-    const w=text.length*6.4+16;
+    const w=text.length*pillCharW+pillPadX;
     let x=xAt(i);
     x=Math.min(Math.max(x,padL+w/2),W-padR-w/2);
-    const ly=side==='up'?y-16:y+16;
+    const ly=side==='up'?y-pillOffset:y+pillOffset;
     return `<g>
-      <rect x="${(x-w/2).toFixed(1)}" y="${(ly-13).toFixed(1)}" width="${w.toFixed(1)}" height="20" rx="10" fill="var(--card)" stroke="var(--border)"/>
-      <text x="${x.toFixed(1)}" y="${(ly+1).toFixed(1)}" text-anchor="middle" class="chartLabel" fill="${color}">${text}</text>
+      <rect x="${(x-w/2).toFixed(1)}" y="${(ly-pillH/2).toFixed(1)}" width="${w.toFixed(1)}" height="${pillH}" rx="${pillH/2}" fill="var(--card)" stroke="var(--border)"/>
+      <text x="${x.toFixed(1)}" y="${(ly+pillH*0.16).toFixed(1)}" text-anchor="middle" class="chartLabel" fill="${color}">${text}</text>
     </g>`;
   };
   const incomePeakIdx=rows.reduce((best,r,i,arr)=>r.income>arr[best].income?i:best,0);
@@ -2626,14 +2641,33 @@ function renderSpendChart(){
   if(activeIdx!==incomePeakIdx && active.income>0) labels+=pillLabel(activeIdx, active.income, yIncome(active.income), 'var(--green)', 'up');
   if(activeIdx!==expensePeakIdx && active.expense>0) labels+=pillLabel(activeIdx, active.expense, yExpense(active.expense), 'var(--text)', 'down');
 
-  // Transaction breakdown for whichever week is active, collapsed unless
-  // you've actually tapped a point. Lets a spike be checked and, if it's a
-  // sync artifact or an internal transfer rather than real spending, its
-  // transaction id added to EXCLUDED_TXN_IDS above without needing to
-  // re-add debug code each time. Shows both income and spending together
-  // now, since the chart itself no longer separates them into two views.
+  // Breakdown for whichever week is active, collapsed unless you've
+  // actually tapped a point. Real weeks show real transactions - lets a
+  // spike be checked and, if it's a sync artifact or an internal transfer
+  // rather than real spending, its transaction id added to
+  // EXCLUDED_TXN_IDS above without needing to re-add debug code each
+  // time. Forecast weeks show what's driving the projection instead
+  // (scheduled bills/salary) since no real transactions exist yet for a
+  // week that hasn't happened.
   let detail='';
-  if(active){
+  if(active && active.forecast){
+    const wkEnd=new Date(parseDate(active.wk)); wkEnd.setDate(wkEnd.getDate()+6);
+    const dueBills=(data.bills||[]).flatMap(b=>dueInstancesInWindow(b,parseDate(active.wk),wkEnd));
+    const paydaysThisWeek=paydays.filter(pd=>pd>=parseDate(active.wk) && pd<=wkEnd);
+    const projRows=[
+      ...paydaysThisWeek.map(pd=>({date:iso(pd), label:'Salary (projected)', amount:salary})),
+      ...dueBills.map(b=>({date:iso(b.next), label:b.description, amount:-(Number(b.amount)||0)})),
+    ].sort((a,b)=>a.date.localeCompare(b.date));
+    detail=`
+    <details class="fnSettings" style="margin-top:14px" open>
+      <summary>Week of ${shortDate(parseDate(active.wk))} · projected income ${money(active.income)} · projected expense ${money(active.expense)}</summary>
+      <table class="table" style="margin-top:10px">
+        <thead><tr><th>Date</th><th>What</th><th>Amount</th></tr></thead>
+        <tbody>${projRows.length?projRows.map(r=>`<tr><td>${niceDate(parseDate(r.date))}</td><td>${escHtml(r.label)}</td><td style="color:${r.amount<0?'var(--red)':'var(--green)'}">${money(r.amount)}</td></tr>`).join(''):'<tr><td colspan="3">Nothing scheduled this week yet.</td></tr>'}</tbody>
+      </table>
+      <p class="fnSub" style="margin-top:8px">Projected from scheduled bills and salary, not real transactions - this week hasn't happened yet.</p>
+    </details>`;
+  } else if(active){
     const wkEnd=new Date(parseDate(active.wk)); wkEnd.setDate(wkEnd.getDate()+6);
     const txns=spendHistory
       .filter(t=>{
