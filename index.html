@@ -566,6 +566,10 @@ const firebaseConfig = {
             <div class="label">Savings goal</div>
             <div class="value goal" id="fnSavingsGoal">$0.00</div>
           </div>
+          <div class="metric">
+            <div class="label">Set aside for bills</div>
+            <div class="value goal" id="fnSetAside">$0.00</div>
+          </div>
         </div>
         <p class="fnHelp" id="fnGoalsHint" style="margin-top:10px"></p>
 
@@ -574,6 +578,15 @@ const firebaseConfig = {
         <div class="fnGroup">
           <div class="fnGroupHead"><span>Bills and fixed payments</span><b id="fnFixedSub">$0.00</b></div>
           <table class="table"><tbody id="fnFixedRows"></tbody></table>
+        </div>
+
+        <div class="fnGroup">
+          <div class="fnGroupHead"><span>Set aside for bills, every fortnight</span><b id="fnSetAsideSub">$0.00</b></div>
+          <p class="fnHelp" style="margin-top:8px">Every bill converted to its fortnightly share and added up - not just what's due in this exact fortnight. A monthly or yearly bill doesn't land every payday, but the money for it should still be put aside every payday, so it's never a surprise when it does land.</p>
+          <details class="fnSettings" style="margin-top:10px">
+            <summary>Show the breakdown</summary>
+            <table class="table" style="margin-top:10px"><tbody id="fnSetAsideRows"></tbody></table>
+          </details>
         </div>
 
       </div>
@@ -1347,6 +1360,27 @@ function getFortnight(){
   // week to week and this app can't commit that money on your behalf.
   const savings=Number(data.settings.fortnightlySavings ?? DEFAULT_SAVINGS)||0;
 
+  // Set aside for bills: every bill converted to its fortnightly-equivalent
+  // share and summed, not just whatever happens to be due in this exact
+  // 14-day window. A monthly rent bill doesn't land every fortnight, but
+  // the money for it should still be set aside every fortnight - otherwise
+  // the fortnight rent IS due looks fine right up until it isn't. Setting
+  // this amount aside every payday (into a separate bills account, say)
+  // means a bill landing is never a surprise, regardless of how the cycle
+  // happens to line up with this fortnight specifically.
+  const FORTNIGHTS_PER_YEAR=26;
+  const toFortnightlyRate=(amount,repeat)=>{
+    const amt=Number(amount)||0;
+    if(repeat==='Weekly') return amt*2;
+    if(repeat==='Monthly') return amt*12/FORTNIGHTS_PER_YEAR;
+    if(repeat==='Yearly') return amt/FORTNIGHTS_PER_YEAR;
+    return amt; // Fortnightly, already the right unit
+  };
+  const setAsideRows=data.bills
+    .map(b=>({name:b.description, repeat:b.repeat, rate:toFortnightlyRate(b.amount,b.repeat)}))
+    .sort((a,b)=>b.rate-a.rate);
+  const setAsideTotal=setAsideRows.reduce((s,r)=>s+r.rate,0);
+
   const fixedTotal=fixed.reduce((s,b)=>s+Number(b.amount||0),0);
   const cardsPayTotal=cardRows.reduce((s,b)=>s+b.pay,0);
 
@@ -1373,7 +1407,8 @@ function getFortnight(){
 
   return {payday,following,fixed,cardRows,salary,cash,savings,availableBalance,
           personalSynced:safeCashAccts.length>0,
-          fixedTotal,cardsPayTotal,committed,safe,daily,daysLeft,dueBeforePayday};
+          fixedTotal,cardsPayTotal,committed,safe,daily,daysLeft,dueBeforePayday,
+          setAsideTotal,setAsideRows};
 }
 
 /* PocketSmith reports liabilities as negative. Render them the way the bank
@@ -1487,8 +1522,8 @@ function renderFortnight(){
   set('fnSavingsGoal',money(f.savings));
 
   const goalsHint=document.getElementById('fnGoalsHint');
-  if(goalsHint) goalsHint.textContent = f.savings>0
-    ? 'A goal, not a bill: not deducted from Safe to spend above.'
+  if(goalsHint) goalsHint.textContent = (f.savings>0 || f.setAsideTotal>0)
+    ? 'Goals, not bills: not deducted from Safe to spend above.'
     : '';
 
   const dueTag=dt=>{const n=daysUntil(dt); const t=n===0?'today':n===1?'tomorrow':n+'d';
@@ -1498,6 +1533,13 @@ function renderFortnight(){
   if(fx) fx.innerHTML=f.fixed.length
     ? f.fixed.map(b=>`<tr><td>${escHtml(b.description)}</td><td>${dueTag(b.next)}</td><td style="text-align:right"><b>${money(b.amount)}</b></td></tr>`).join('')
     : '<tr><td colspan="3">Nothing due this fortnight.</td></tr>';
+
+  set('fnSetAside',money(f.setAsideTotal));
+  set('fnSetAsideSub',money(f.setAsideTotal));
+  const sa=document.getElementById('fnSetAsideRows');
+  if(sa) sa.innerHTML=f.setAsideRows.length
+    ? f.setAsideRows.map(r=>`<tr><td>${escHtml(r.name)}</td><td class="hideMobile">${escHtml(r.repeat||'Fortnightly')}</td><td style="text-align:right"><b>${money(r.rate)}</b></td></tr>`).join('')
+    : '<tr><td colspan="3">No bills yet. Add one under Payments &amp; Setup.</td></tr>';
 
   const warn=document.getElementById('fnWarn');
   if(warn){
