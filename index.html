@@ -1251,8 +1251,8 @@ function syncDebtFor(name,amount,color,type){
 // Prefers the live PocketSmith balance over the manually-entered one, same
 // as the CARDS tile and the net worth calc already do - this was the one
 // place still reading the raw manual a.balance unconditionally, which is
-// why Total Debt, the avalanche/snowball order and "what if I paid extra"
-// could all disagree with what the card itself displayed once it synced.
+// why Total Debt and the avalanche/snowball order could disagree with
+// what the card itself displayed once it synced.
 function syncFigures(){
   data.accounts.forEach(a=>{
     const live=liveCardAccount(a.name);
@@ -1600,45 +1600,6 @@ function renderFortnight(){
 let payoffStrategy='snowball';
 function setPayoffStrategy(s){ if(s===payoffStrategy) return; payoffStrategy=s; render(); }
 
-// This debt's periodic repayment, raw (no cadence conversion) - matches
-// getFortnight()'s cardRows/loan handling exactly, which also just takes
-// the raw bill/loan amount as-is regardless of its repeat cycle. Keeping
-// the same simplification here means this number never disagrees with
-// the "Debt free (est.)" figure right above it on the same page.
-function repaymentFor(debt){
-  const loan=(data.loans||[]).find(l=>normalise(l.name)===normalise(debt.name));
-  if(loan) return Number(loan.paymentAmount)||0;
-  const account=data.accounts.find(a=>normalise(a.name)===normalise(debt.name)||paymentMatches(debt.name,a.name));
-  if(account){
-    const bill=data.bills.find(b=>paymentMatches(b.description,account.name));
-    return (bill?Number(bill.amount)||0:0) + (Number(account.extra)||0);
-  }
-  return 0;
-}
-
-// Set by the Total Debt render whenever the payoff-order list changes, so
-// the "what if I paid extra" input can react instantly (updateExtraPayoff
-// only touches its own result text, not the whole panel - regenerating
-// the panel's innerHTML on every keystroke would blow away the input's
-// focus and cursor position while typing).
-let topPriorityDebt=null;
-function updateExtraPayoff(){
-  const el=document.getElementById('extraPayoffResult');
-  const input=document.getElementById('extraPayoffInput');
-  if(!el || !input || !topPriorityDebt) return;
-  const {name, balance, rate} = topPriorityDebt;
-  if(rate<=0){ el.textContent=`No repayment amount set for ${name} yet — add one under Cards or Loans first.`; return; }
-  const extra=Math.max(0, +input.value || 0);
-  const currentFns=Math.ceil(balance/rate);
-  const fnWord=n=>`${n} fortnight${n===1?'':'s'}`;
-  if(extra<=0){ el.textContent=`${name} clears in about ${fnWord(currentFns)} at the current repayment.`; return; }
-  const newFns=Math.ceil(balance/(rate+extra));
-  const saved=currentFns-newFns;
-  el.textContent = saved>0
-    ? `${name} clears in about ${fnWord(newFns)} instead of ${fnWord(currentFns)} — ${fnWord(saved)} sooner.`
-    : `${name} clears in about ${fnWord(newFns)} — already about as fast as extra repayments can take it.`;
-}
-
 function render(){
   try{
     renderBank();
@@ -1750,7 +1711,6 @@ function render(){
 
       if(!total){
         panel.innerHTML='<div class="fnSub">No debts recorded. Add one under Setup.</div>';
-        topPriorityDebt=null;
         return;
       }
 
@@ -1867,7 +1827,6 @@ function render(){
           const ordered=debts.map(d=>({...d,rate:rateFor(d)})).sort((a,b)=>
             strategy==='avalanche' ? (b.rate-a.rate || b.amount-a.amount) : (a.amount-b.amount)
           );
-          topPriorityDebt = ordered[0] ? {name:ordered[0].name, balance:ordered[0].amount, rate:repaymentFor(ordered[0])} : null;
           return `
         <div class="fnGroup">
           <div class="fnGroupHead">
@@ -1886,20 +1845,9 @@ function render(){
               ? 'Avalanche: highest interest rate first &mdash; mathematically the least interest paid overall.'
               : 'Snowball: smallest balance first &mdash; clears an account fastest for momentum, not the cheapest order.')
             : 'Showing snowball order (smallest balance first). Add an interest rate under Cards or Loans to unlock avalanche ordering.'}</p>
-        </div>
-
-        ${topPriorityDebt ? `
-        <div class="fnGroup">
-          <div class="fnGroupHead"><span>What if I paid extra?</span></div>
-          <label style="display:block;margin-top:10px">
-            <span class="fnHint" style="display:block;margin-bottom:6px">Extra per fortnight toward ${escHtml(topPriorityDebt.name)} (your #1 priority above)</span>
-            <input id="extraPayoffInput" type="number" step="0.01" min="0" placeholder="0.00" oninput="updateExtraPayoff()">
-          </label>
-          <p id="extraPayoffResult" class="fnSub" style="margin-top:10px"></p>
-        </div>` : ''}`;
+        </div>`;
         })()}`;
     })();
-    updateExtraPayoff();
 
     if(document.getElementById('profileCardsTable')){
       profileCardsTable.innerHTML=data.accounts.map((a,i)=>{
