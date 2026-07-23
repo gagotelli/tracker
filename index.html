@@ -557,18 +557,14 @@ const firebaseConfig = {
           </div>
         </div>
 
-        <div class="acctMetrics" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+        <div class="acctMetrics" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);grid-template-columns:repeat(2,minmax(0,1fr))">
           <div class="metric">
-            <div class="label">Bills &amp; fixed</div>
-            <div class="value" id="fnFixedTotal">$0.00</div>
+            <div class="label">Set aside for bills</div>
+            <div class="value" id="fnSetAside">$0.00</div>
           </div>
           <div class="metric">
             <div class="label">Savings goal</div>
             <div class="value goal" id="fnSavingsGoal">$0.00</div>
-          </div>
-          <div class="metric">
-            <div class="label">Set aside for bills</div>
-            <div class="value goal" id="fnSetAside">$0.00</div>
           </div>
         </div>
         <p class="fnHelp" id="fnGoalsHint" style="margin-top:10px"></p>
@@ -576,17 +572,17 @@ const firebaseConfig = {
         <div id="fnWarn" class="notice" style="display:none"></div>
 
         <div class="fnGroup">
-          <div class="fnGroupHead"><span>Bills and fixed payments</span><b id="fnFixedSub">$0.00</b></div>
-          <table class="table"><tbody id="fnFixedRows"></tbody></table>
-        </div>
-
-        <div class="fnGroup">
           <div class="fnGroupHead"><span>Set aside for bills, every fortnight</span><b id="fnSetAsideSub">$0.00</b></div>
-          <p class="fnHelp" style="margin-top:8px">Every bill converted to its fortnightly share and added up - not just what's due in this exact fortnight. A monthly or yearly bill doesn't land every payday, but the money for it should still be put aside every payday, so it's never a surprise when it does land.</p>
+          <p class="fnHelp" style="margin-top:8px">Every bill converted to its fortnightly share and added up - not just what's due in this exact fortnight. A monthly or yearly bill doesn't land every payday, but the money for it should still be put aside every payday, so it's never a surprise when it does land. This is what's subtracted from Safe to spend above.</p>
           <details class="fnSettings" style="margin-top:10px">
             <summary>Show the breakdown</summary>
             <table class="table" style="margin-top:10px"><tbody id="fnSetAsideRows"></tbody></table>
           </details>
+        </div>
+
+        <div class="fnGroup">
+          <div class="fnGroupHead"><span>Upcoming bills</span><b id="fnFixedSub">$0.00</b></div>
+          <table class="table"><tbody id="fnFixedRows"></tbody></table>
         </div>
 
       </div>
@@ -1384,7 +1380,13 @@ function getFortnight(){
   const fixedTotal=fixed.reduce((s,b)=>s+Number(b.amount||0),0);
   const cardsPayTotal=cardRows.reduce((s,b)=>s+b.pay,0);
 
-  const committed=fixedTotal;
+  // Committed against Safe to spend is the smoothed set-aside total, not
+  // just this fortnight's actually-due bills. More conservative on
+  // purpose: reserving a share of every bill, not only the ones landing
+  // right now, means a lumpy one (yearly renewal, say) can never blindside
+  // you later just because it happened to fall in a fortnight that
+  // otherwise looked clear.
+  const committed=setAsideTotal;
   // Safe to spend comes from what's actually sitting in your personal
   // account right now (live via PocketSmith, falling back to the manual
   // cash figure if that account hasn't synced), not the salary setting.
@@ -1516,14 +1518,13 @@ function renderFortnight(){
     badge.className = d===0?'fnBadge':'fnBadge idle';
   }
 
-  set('fnFixedTotal',money(f.fixedTotal));
   set('fnFixedSub',money(f.fixedTotal));
 
   set('fnSavingsGoal',money(f.savings));
 
   const goalsHint=document.getElementById('fnGoalsHint');
-  if(goalsHint) goalsHint.textContent = (f.savings>0 || f.setAsideTotal>0)
-    ? 'Goals, not bills: not deducted from Safe to spend above.'
+  if(goalsHint) goalsHint.textContent = f.savings>0
+    ? 'Savings goal is a target, not a bill: not deducted from Safe to spend above.'
     : '';
 
   // "Soon" used to mean only today/tomorrow, which left most of a 14-day
@@ -1550,7 +1551,7 @@ function renderFortnight(){
   if(warn){
     if(f.safe<0){
       warn.style.display='';
-      warn.innerHTML=`This fortnight's bills add up to <b>${money(Math.abs(f.safe))}</b> more than what's in your account.`;
+      warn.innerHTML=`Your fortnightly set-aside for bills is <b>${money(Math.abs(f.safe))}</b> more than what's in your account.`;
     } else if(f.dueBeforePayday>0 && f.cash<f.dueBeforePayday){
       warn.style.display='';
       warn.innerHTML=`<b>${money(f.dueBeforePayday)}</b> is due before payday but you only have <b>${money(f.cash)}</b> cash available.`;
