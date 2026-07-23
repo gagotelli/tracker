@@ -195,8 +195,9 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .loanPct b{display:block;font-family:var(--mono);font-size:24px;font-weight:700;color:var(--green)}
 .loanPct span{font-size:12px;color:var(--muted)}
 .loanPct b.muted{color:var(--muted)}
-.debtBar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--border);margin:14px 0 10px;gap:2px}
-.debtSeg{height:100%}
+.debtBar{display:flex;height:22px;border-radius:999px;overflow:hidden;background:var(--border);margin:14px 0 10px;gap:2px}
+.debtSeg{height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.debtSegPct{font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;white-space:nowrap;text-shadow:0 1px 1px rgba(0,0,0,.35)}
 .debtLegend{display:flex;flex-direction:column;gap:10px;font-size:12px;color:var(--muted)}
 .debtRow span{display:flex;align-items:center}
 .debtLegend .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;flex-shrink:0}
@@ -1785,7 +1786,7 @@ function render(){
           </div>
         </div>
 
-        <div class="debtBar">${debts.map(d=>`<div class="debtSeg" style="width:${d.amount/total*100}%;background:${d.color||'var(--muted)'}" title="${escHtml(d.name)}"></div>`).join('')}</div>
+        <div class="debtBar">${debts.map((d,i)=>`<div class="debtSeg" style="width:${d.amount/total*100}%;background:${d.color||'var(--muted)'}" title="${escHtml(d.name)} - ${pct[i]}%">${pct[i]>=8?`<span class="debtSegPct">${pct[i]}%</span>`:''}</div>`).join('')}</div>
 
         <div class="debtLegend">
           ${debts.map((d,i)=>{
