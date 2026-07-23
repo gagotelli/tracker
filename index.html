@@ -1015,12 +1015,27 @@ function defaultCardColor(name){
   if(n.includes('gem') || n.includes('latitude')) return '#8e35b8';
   return '#2f77d0';
 }
-// Same one-shape-per-section idea as cardIconSvg: every loan gets this
-// same landmark outline, coloured by the loan's own colour swatch, so
-// LOANS reads as a variant of the CARDS layout instead of a different
-// section design.
+// Same one-shape-per-section idea as cardIconSvg, but a landmark outline
+// reads as generic/meaningless next to a loan actually named "Motorbike
+// Loan" - so LOANS picks its icon by what the loan is actually for
+// (matched off the name, same approach as defaultCardColor above),
+// falling back to the landmark for anything that isn't a known vehicle
+// type (personal loan, mortgage, etc). All three stay in the same
+// stroke style as cardIconSvg so the section still reads as one family.
 function loanIconSvg(color){
   return `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 4l9 5.5"/><line x1="4" y1="9.5" x2="20" y2="9.5"/><line x1="5.5" y1="9.5" x2="5.5" y2="18"/><line x1="9.5" y1="9.5" x2="9.5" y2="18"/><line x1="14.5" y1="9.5" x2="14.5" y2="18"/><line x1="18.5" y1="9.5" x2="18.5" y2="18"/><line x1="3.5" y1="19" x2="20.5" y2="19"/></svg>`;
+}
+function motorbikeIconSvg(color){
+  return `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3"/><circle cx="18.5" cy="17.5" r="3"/><path d="M5.5 17.5L9 11h4.5l3 4h2"/><path d="M9 11l1.8-3h3"/></svg>`;
+}
+function carIconSvg(color){
+  return `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.5V13l2-4.5h12l2 4.5v3.5"/><path d="M4 16.5h16"/><circle cx="7.5" cy="16.5" r="1.6"/><circle cx="16.5" cy="16.5" r="1.6"/></svg>`;
+}
+function loanIcon(name,color){
+  const n=String(name||'').toLowerCase();
+  if(n.includes('motorbike') || n.includes('motorcycle') || n.includes('scooter') || n.includes('bike')) return motorbikeIconSvg(color);
+  if(n.includes('car') || n.includes('vehicle') || n.includes('auto')) return carIconSvg(color);
+  return loanIconSvg(color);
 }
 
 // Shared "how far along is this" graph: a ring, muted track behind a
@@ -1686,7 +1701,7 @@ function render(){
         const nextDebit=bill?niceDate(nextDate(bill)):'Not set';
         const color=l.color||'var(--blue)';
         return `<div class="card span6">
-          <div class="acctHead"><div class="logo">${loanIconSvg(color)}</div><div class="name">${escHtml(l.name)}</div></div>
+          <div class="acctHead"><div class="logo">${loanIcon(l.name,color)}</div><div class="name">${escHtml(l.name)}</div></div>
           <div class="cardMetricRow" style="margin-top:10px">
             <div>
               <div class="cardBal">${money(remain)}</div>
