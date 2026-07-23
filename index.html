@@ -631,13 +631,6 @@ const firebaseConfig = {
 
     <div class="grid" style="margin-bottom:16px">
       <div class="card span12">
-        <h2 class="section-title">NET WORTH OVER TIME</h2>
-        <div id="netWorthChart"><div class="fnSub">Loading net worth history…</div></div>
-      </div>
-    </div>
-
-    <div class="grid" style="margin-bottom:16px">
-      <div class="card span12">
         <div class="bkHead">
           <h2 class="section-title">COMMBANK</h2>
           <div style="display:flex;align-items:center;gap:14px">
@@ -2156,16 +2149,15 @@ function resetCurrentProfile(){
   saveStore(); render();
 }
 // Full backup, not just the manually-entered store: transaction history
-// and net worth history live in their own Firestore subcollections (not
-// part of `store`), and they're the pieces you can't just re-type back in
-// if this account or project ever went away - settings/bills/cards/loans
-// are annoying to redo, but a year of net worth trend is gone for good.
+// lives in its own Firestore subcollection (not part of `store`), and
+// it's a piece you can't just re-type back in if this account or project
+// ever went away - settings/bills/cards/loans are annoying to redo, but a
+// year of transaction history is gone for good.
 function downloadBackup(){
   const payload={
     exportedAt: new Date().toISOString(),
     store,
     transactions: Array.isArray(spendHistory) ? spendHistory : [],
-    netWorthHistory: Array.isArray(netWorthHistory) ? netWorthHistory : [],
   };
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const a=document.createElement('a');
@@ -2244,99 +2236,6 @@ function loadSpendHistory(){
       spendHistoryError=(e.code||e.message||'unknown error');
       renderSpendChart();
     });
-}
-
-// One doc per day, written by pushNetWorthSnapshot() below - see there for
-// what's included/excluded from the figure itself.
-let netWorthHistory=null;
-let netWorthHistoryError=null;
-function loadNetWorthHistory(){
-  if(!window._db || !cloudUser){
-    netWorthHistoryError='Not signed in yet.';
-    renderNetWorthChart();
-    return;
-  }
-  window._db.collection('trackers').doc(cloudUser.uid).collection('netWorthHistory')
-    .orderBy('date','asc')
-    .get()
-    .then(snap=>{
-      netWorthHistoryError=null;
-      netWorthHistory=snap.docs.map(d=>d.data());
-      renderNetWorthChart();
-    })
-    .catch(e=>{
-      console.error('net worth history load failed', e);
-      netWorthHistoryError=(e.code||e.message||'unknown error');
-      renderNetWorthChart();
-    });
-}
-
-// Single smooth line, not bars - unlike the weekly cash flow figures,
-// net worth is a running balance, not a sum bucketed into a period, so
-// a continuous trend line is the honest shape for it.
-function renderNetWorthChart(){
-  const box=document.getElementById('netWorthChart');
-  if(!box) return;
-  if(netWorthHistoryError){
-    box.innerHTML='<div class="fnSub">Couldn\'t load net worth history ('+escHtml(netWorthHistoryError)+').</div>';
-    return;
-  }
-  if(!Array.isArray(netWorthHistory)){
-    box.innerHTML='<div class="fnSub">Loading net worth history…</div>';
-    return;
-  }
-  if(netWorthHistory.length<2){
-    box.innerHTML='<div class="fnSub">Net worth is tracked once a day - come back tomorrow for a trend to appear.</div>';
-    return;
-  }
-
-  const rows=netWorthHistory.slice(-90);
-  const values=rows.map(r=>Number(r.netWorth)||0);
-  const min=Math.min(...values,0), max=Math.max(...values,0);
-  const range=(max-min)||1;
-
-  const W=760, H=220, padL=16, padR=16, padT=30, padB=26;
-  const plotW=W-padL-padR, plotH=H-padT-padB;
-  const n=rows.length;
-  const xAt=i=> n<=1 ? padL+plotW/2 : padL+(plotW*i/(n-1));
-  const yAt=v=> padT+plotH-((v-min)/range*plotH);
-  const pts=rows.map((r,i)=>[xAt(i),yAt(Number(r.netWorth)||0)]);
-  const color='var(--blue)';
-
-  const xLabels=rows.map((r,i)=>{
-    const stride=Math.max(1,Math.ceil(n/6));
-    const skip=n>6 && (i%stride!==0) && i!==n-1;
-    if(skip) return '';
-    return `<text x="${xAt(i).toFixed(1)}" y="${H-6}" text-anchor="middle" class="chartAxis">${shortDate(parseDate(r.date))}</text>`;
-  }).join('');
-
-  const current=values[values.length-1];
-  const change=current-values[0];
-  const baseY=padT+plotH;
-  const topLabel=`<text x="${padL}" y="${(padT+4).toFixed(1)}" text-anchor="start" class="chartAxis">${money(max)}</text>`;
-  const bottomLabel=max!==min?`<text x="${padL}" y="${baseY.toFixed(1)}" text-anchor="start" class="chartAxis">${money(min)}</text>`:'';
-  const endDot=`<circle cx="${pts[pts.length-1][0].toFixed(1)}" cy="${pts[pts.length-1][1].toFixed(1)}" r="4" fill="${color}" stroke="var(--card)" stroke-width="2"/>`;
-
-  box.innerHTML=`
-    <svg viewBox="0 0 ${W} ${H}" class="spendSvg" preserveAspectRatio="xMinYMin meet">
-      <defs>
-        <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity=".28"/>
-          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <path d="${monotonePath(pts)} L ${pts[pts.length-1][0].toFixed(1)},${baseY.toFixed(1)} L ${pts[0][0].toFixed(1)},${baseY.toFixed(1)} Z" fill="url(#netWorthGrad)"/>
-      <path d="${monotonePath(pts)}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      ${endDot}
-      ${topLabel}
-      ${bottomLabel}
-      ${xLabels}
-    </svg>
-    <div class="chartLegend">
-      <span class="chartStat"><span class="chartSub">Net worth</span><b class="chartBig">${money(current)}</b></span>
-      <span class="chartStat"><span class="chartSub">Since ${shortDate(parseDate(rows[0].date))}</span><b class="chartBig" style="color:${change>=0?'var(--green)':'var(--red)'}">${change>=0?'+':''}${money(change)}</b></span>
-    </div>
-    <div class="fnSub" style="margin-top:6px">${n} day${n===1?'':'s'} tracked: live bank/card balances, minus unsynced card balances and loan balances remaining. Doesn't include anything outside this tracker.</div>`;
 }
 
 // One-off data artifact, excluded by exact transaction id since it isn't a
@@ -2800,37 +2699,6 @@ function pushToCloud(force){
   }, 400);
 }
 
-// Best-effort net worth: every live-synced bank/latitude account balance
-// (liabilities already arrive negative from the Cloud Function, so this is
-// a straight sum), minus any card that hasn't synced yet (its manually
-// entered balance isn't in bank/latitude at all), minus every loan's
-// remaining balance (loans are pure local entries, never part of a
-// PocketSmith feed). Doesn't know about anything outside this tracker -
-// property, investments, cash under the mattress - so it's a floor on
-// your real net worth, not the whole picture.
-function computeNetWorth(){
-  let nw=0;
-  if(bank && Array.isArray(bank.accounts)) nw+=bank.accounts.reduce((s,a)=>s+(Number(a.balance)||0),0);
-  if(latitude && Array.isArray(latitude.accounts)) nw+=latitude.accounts.reduce((s,a)=>s+(Number(a.balance)||0),0);
-  (data.accounts||[]).forEach(a=>{ if(!liveCardAccount(a.name)) nw-=Number(a.balance)||0; });
-  (data.loans||[]).forEach(l=>{ nw-=Math.max((Number(l.total)||0)-(Number(l.paid)||0),0); });
-  return nw;
-}
-
-// Writes today's net worth once per page load (not on every render() call,
-// which would be constantly and pointlessly), keyed on the date so re-runs
-// the same day overwrite rather than duplicate. Firestore rules need write
-// access on this subcollection specifically - see firestore.rules.
-let netWorthWrittenThisSession=false;
-function pushNetWorthSnapshot(){
-  if(netWorthWrittenThisSession || !window._db || !cloudUser) return;
-  netWorthWrittenThisSession=true;
-  const day=iso(today());
-  window._db.collection('trackers').doc(cloudUser.uid).collection('netWorthHistory').doc(day)
-    .set({ date:day, netWorth:Math.round(computeNetWorth()*100)/100, updatedAt:Date.now() }, { merge:true })
-    .catch(e=>console.error('net worth snapshot failed', e));
-}
-
 function initCloud(){
   if(!cloudConfigured()){
     // stay local-only until config is pasted, but say so loudly
@@ -2874,7 +2742,6 @@ function initCloud(){
     toggleSignOut(true, user);
     autoSyncBank();
     loadSpendHistory();
-    loadNetWorthHistory();
     const ref=db.collection('trackers').doc(user.uid);
     cloudDocUnsub=ref.onSnapshot(snap=>{
       if(snap.metadata.hasPendingWrites) return; // ignore our own local write echo
@@ -2895,7 +2762,6 @@ function initCloud(){
           data=store.profiles[store.active];
           if(!CLOUD) localStorage.setItem(STORE_KEY,JSON.stringify(store));
           render();
-          pushNetWorthSnapshot();
         } finally { applyingRemote=false; }
         cloudReady=true;
         // Persisted only after applyingRemote resets, otherwise pushToCloud's
