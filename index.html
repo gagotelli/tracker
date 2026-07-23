@@ -577,7 +577,6 @@ const firebaseConfig = {
             <div class="value goal" id="fnSavingsGoal">$0.00</div>
           </div>
         </div>
-        <p class="fnHelp" id="fnGoalsHint" style="margin-top:10px"></p>
 
         <div id="fnWarn" class="notice" style="display:none"></div>
 
@@ -1530,11 +1529,6 @@ function renderFortnight(){
   set('fnFixedSub',money(f.fixedTotal));
 
   set('fnSavingsGoal',money(f.savings));
-
-  const goalsHint=document.getElementById('fnGoalsHint');
-  if(goalsHint) goalsHint.textContent = f.savings>0
-    ? 'Savings goal is a target, not a bill: not deducted from Safe to spend above.'
-    : '';
 
   // "Soon" used to mean only today/tomorrow, which left most of a 14-day
   // fortnight's bills looking untracked even though they're all already
