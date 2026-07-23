@@ -203,6 +203,14 @@ dialog{border:0;border-radius:16px;padding:24px;width:min(520px,92vw);box-shadow
 .cardBalLbl{font-size:12px;color:var(--muted);margin-top:3px}
 .cardUtil{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted)}
 .cardUtil b{font-family:var(--mono)}
+.card.stWarn,.card.stDanger{position:relative;overflow:hidden}
+.card.stWarn{background:linear-gradient(180deg,color-mix(in srgb,#b77900 6%,var(--card)),var(--card) 55%);border-color:color-mix(in srgb,#b77900 35%,var(--border))}
+.card.stWarn::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#b77900}
+.card.stDanger{background:linear-gradient(180deg,color-mix(in srgb,var(--red) 7%,var(--card)),var(--card) 55%);border-color:color-mix(in srgb,var(--red) 40%,var(--border))}
+.card.stDanger::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--red)}
+.statusPill{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:999px;margin-left:auto;flex-shrink:0}
+.statusPill.warn{background:rgba(183,121,0,.16);color:#b77900}
+.statusPill.danger{background:rgba(214,64,64,.14);color:var(--red)}
 .loanTop{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .loanPct{text-align:right}
 .loanPct b{display:block;font-family:var(--mono);font-size:24px;font-weight:700;color:var(--green)}
@@ -1666,8 +1674,10 @@ function render(){
           <div><div class="label">Payment due</div><b class="danger">${escHtml(dueDate)}</b></div>
         </div>`;
       const meterColor=!hasLimit?'var(--muted)':u>=90?'var(--red)':u>=70?'#b77900':'var(--green)';
-      return `<div class="card span6">
-        <div class="acctHead"><div class="logo">${cardIconSvg(a.color||defaultCardColor(a.name))}</div><div class="name">${escHtml(a.name)}</div></div>
+      const statusClass=klass==='danger'?' stDanger':klass==='warn'?' stWarn':'';
+      const statusPill=klass==='danger'?'<span class="statusPill danger">Near limit</span>':klass==='warn'?'<span class="statusPill warn">Approaching limit</span>':'';
+      return `<div class="card span6${statusClass}">
+        <div class="acctHead"><div class="logo">${cardIconSvg(a.color||defaultCardColor(a.name))}</div><div class="name">${escHtml(a.name)}</div>${statusPill}</div>
         <div class="cardMetricRow" style="margin-top:10px">
           <div>
             <div class="cardBal">${money(balance)}</div>
