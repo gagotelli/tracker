@@ -710,7 +710,7 @@ const firebaseConfig = {
     <div class="grid" style="margin-bottom:16px">
       <div class="card span12">
         <h2 class="section-title">LOANS</h2>
-        <div id="loanPanel"></div>
+        <div class="grid" id="loanPanel"></div>
       </div>
     </div>
 
@@ -1012,6 +1012,13 @@ function defaultCardColor(name){
   if(n.includes('commbank') || n.includes('mastercard')) return '#2f77d0';
   if(n.includes('gem') || n.includes('latitude')) return '#8e35b8';
   return '#2f77d0';
+}
+// Same one-shape-per-section idea as cardIconSvg: every loan gets this
+// same landmark outline, coloured by the loan's own colour swatch, so
+// LOANS reads as a variant of the CARDS layout instead of a different
+// section design.
+function loanIconSvg(color){
+  return `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 4l9 5.5"/><line x1="4" y1="9.5" x2="20" y2="9.5"/><line x1="5.5" y1="9.5" x2="5.5" y2="18"/><line x1="9.5" y1="9.5" x2="9.5" y2="18"/><line x1="14.5" y1="9.5" x2="14.5" y2="18"/><line x1="18.5" y1="9.5" x2="18.5" y2="18"/><line x1="3.5" y1="19" x2="20.5" y2="19"/></svg>`;
 }
 
 // Shared "how far along is this" graph: a ring, muted track behind a
@@ -1707,22 +1714,23 @@ function render(){
         panel.innerHTML='<div class="fnSub">No loans recorded. Add one under Payments &amp; Setup.</div>';
         return;
       }
-      panel.innerHTML=loans.map((l,i)=>{
+      panel.innerHTML=loans.map((l)=>{
         const total=Number(l.total)||0;
         const paid=Number(l.paid)||0;
         const remain=Math.max(total-paid,0);
         const pct=total>0?Math.min(100,paid/total*100):0;
         const bill=data.bills.find(b=>paymentMatches(b.description,l.name));
         const nextDebit=bill?niceDate(nextDate(bill)):'Not set';
-        const divStyle=i>0?' style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)"':'';
-        return `<div${divStyle}>
-          <div class="loanTop">
+        const color=l.color||'var(--blue)';
+        return `<div class="card span6">
+          <div class="acctHead"><div class="logo">${loanIconSvg(color)}</div><div class="name">${escHtml(l.name)}</div></div>
+          <div class="cardMetricRow" style="margin-top:10px">
             <div>
-              <div class="label">${escHtml(l.name)}</div>
-              <div class="fnBig">${money(remain)}</div>
-              <div class="fnSub">${money(paid)} paid of ${money(total)}</div>
+              <div class="cardBal">${money(remain)}</div>
+              <div class="cardBalLbl">remaining</div>
+              <div class="cardUtil" style="margin-top:8px"><span>${money(paid)} paid of ${money(total)}</span></div>
             </div>
-            ${arcMeter(pct,l.color||'var(--blue)',64,'paid off')}
+            ${arcMeter(pct,color,64,'paid off')}
           </div>
           <div class="subgrid" style="margin-top:14px">
             <div><div class="label">Payment</div><b>${money(l.paymentAmount)} <span class="fnDue">${escHtml(l.repeat||'Fortnightly')}</span></b></div>
