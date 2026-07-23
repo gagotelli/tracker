@@ -1526,8 +1526,13 @@ function renderFortnight(){
     ? 'Goals, not bills: not deducted from Safe to spend above.'
     : '';
 
+  // "Soon" used to mean only today/tomorrow, which left most of a 14-day
+  // fortnight's bills looking untracked even though they're all already
+  // counted in the total above. A week out is a reasonable "worth
+  // noticing" cutoff without diluting today/tomorrow's real urgency -
+  // those still read distinctly via the exact "today"/"tomorrow" text.
   const dueTag=dt=>{const n=daysUntil(dt); const t=n===0?'today':n===1?'tomorrow':n+'d';
-    return `<span class="fnDue${n<=1?' soon':''}">${shortDate(dt)} &middot; ${t}</span>`;};
+    return `<span class="fnDue${n<=7?' soon':''}">${shortDate(dt)} &middot; ${t}</span>`;};
 
   const fx=document.getElementById('fnFixedRows');
   if(fx) fx.innerHTML=f.fixed.length
