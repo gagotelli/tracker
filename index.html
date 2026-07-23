@@ -578,8 +578,6 @@ const firebaseConfig = {
           </div>
         </div>
 
-        <div id="fnWarn" class="notice" style="display:none"></div>
-
         <div class="fnGroup">
           <div class="fnGroupHead"><span>Set aside for bills, every fortnight</span><b id="fnSetAsideSub">$0.00</b></div>
           <details class="fnSettings" style="margin-top:10px">
@@ -1550,18 +1548,6 @@ function renderFortnight(){
     ? f.setAsideRows.map(r=>`<tr><td>${escHtml(r.name)}</td><td class="hideMobile">${escHtml(r.repeat||'Fortnightly')}</td><td style="text-align:right"><b>${money(r.rate)}</b></td></tr>`).join('')
     : '<tr><td colspan="3">No bills yet. Add one under Payments &amp; Setup.</td></tr>';
 
-  const warn=document.getElementById('fnWarn');
-  if(warn){
-    if(f.safe<0){
-      warn.style.display='';
-      warn.innerHTML=`Your fortnightly set-aside for bills is <b>${money(Math.abs(f.safe))}</b> more than what's in your account.`;
-    } else if(f.dueBeforePayday>0 && f.cash<f.dueBeforePayday){
-      warn.style.display='';
-      warn.innerHTML=`<b>${money(f.dueBeforePayday)}</b> is due before payday but you only have <b>${money(f.cash)}</b> cash available.`;
-    } else {
-      warn.style.display='none';
-    }
-  }
 }
 
 // Suggested payoff order under Total Debt: avalanche (highest interest
