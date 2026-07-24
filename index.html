@@ -1442,13 +1442,25 @@ function getFortnight(){
   const fixedTotal=fixed.reduce((s,b)=>s+Number(b.amount||0),0);
   const cardsPayTotal=cardRows.reduce((s,b)=>s+b.pay,0);
 
-  // Committed against Safe to spend is the smoothed set-aside total, not
-  // just this fortnight's actually-due bills. More conservative on
-  // purpose: reserving a share of every bill, not only the ones landing
-  // right now, means a lumpy one (yearly renewal, say) can never blindside
-  // you later just because it happened to fall in a fortnight that
-  // otherwise looked clear.
-  const committed=setAsideTotal;
+  // Anything still landing between now and the next payday has to come out
+  // of the cash on hand. The window starts at today, not at the start of
+  // the cycle, so a bill drops out of this total the day after its due date
+  // passes - which is exactly when you've actually paid it.
+  const dueBeforePayday=data.bills
+    .flatMap(b=>dueInstancesInWindow(b,today(),cycleEnd))
+    .reduce((s,b)=>s+Number(b.amount||0),0);
+
+  // Committed against Safe to spend is what's still genuinely to come, not
+  // the smoothed set-aside total. Smoothing was the old behaviour and it
+  // had a real flaw: setAsideTotal sums every bill's fortnightly share
+  // unconditionally, with no notion of a bill being paid, so the moment you
+  // paid rent - the exact thing the buffer exists for - Safe to spend still
+  // demanded the full buffer sit there AND the money was already gone. It
+  // read permanently negative by design. The trade is that lumpy bills are
+  // no longer reserved for months ahead; they land on Safe to spend in the
+  // fortnight they're actually due. setAsideTotal is still computed and
+  // still shown on the card as its own reference figure.
+  const committed=dueBeforePayday;
   // Safe to spend comes from what's actually sitting in your personal
   // account right now (live via PocketSmith, falling back to the manual
   // cash figure if that account hasn't synced), not the salary setting.
@@ -1462,12 +1474,6 @@ function getFortnight(){
   // by zero on payday itself.
   const daysLeft=Math.max(1,daysUntil(cycleEnd));
   const daily=safe/daysLeft;
-
-  // coverage: anything landing before the next payday must come out of
-  // cash on hand
-  const dueBeforePayday=data.bills
-    .flatMap(b=>dueInstancesInWindow(b,today(),cycleEnd))
-    .reduce((s,b)=>s+Number(b.amount||0),0);
 
   return {payday,following,fixed,cardRows,salary,cash,savings,availableBalance,
           personalSynced:safeCashAccts.length>0,
