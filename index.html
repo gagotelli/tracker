@@ -23,7 +23,13 @@
 <title>Finance Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Loaded non-blocking: a plain stylesheet link here costs a full round trip
+     to fonts.googleapis.com before anything can paint. Inter is already set up
+     with display=swap and every font stack falls back to system-ui, so the
+     page renders correctly without it and simply swaps Inter in on arrival -
+     the same swap that was happening anyway, just no longer holding up paint. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all';this.onload=null">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
 <style>
 :root{
   --bg:#f4f6f9;
@@ -479,11 +485,18 @@ input[type=number],input[type=date]{font-family:var(--mono)}
 .gval{font-size:20px;font-weight:800;margin-top:6px;letter-spacing:-.01em}
 @media(max-width:520px){.heroAmt{font-size:28px}}
 </style>
-<!-- ===== FIREBASE (cloud sync) ===== -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
+<!-- ===== FIREBASE (cloud sync) =====
+     All four are deferred: together they're roughly 600KB, and without defer
+     they blocked HTML parsing entirely, so nothing painted until the whole
+     SDK had downloaded, parsed and executed. Deferred scripts download in
+     parallel while the HTML parses and execute in order right before
+     DOMContentLoaded, which is when initCloud() is now called from - so the
+     ordering the app relies on still holds, it just stops blocking paint. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script>
 /* Firebase config for project finance-tracker-gg.
    These values are public by design in a web app. Security comes from the Firestore rules,
@@ -2595,9 +2608,13 @@ function renderSpendChart(){
     ${detail}`;
 }
 
+// Deliberately does NOT check `typeof firebase`: CLOUD is evaluated at parse
+// time, and the SDK is deferred, so the global doesn't exist yet at that
+// point. Whether the SDK actually arrived is a separate question, checked in
+// initCloud() below once DOMContentLoaded guarantees the deferred scripts
+// have run. This function answers only "is real config present".
 function cloudConfigured(){
-  return typeof firebase!=='undefined'
-    && typeof firebaseConfig!=='undefined'
+  return typeof firebaseConfig!=='undefined'
     && firebaseConfig.apiKey
     && !/PASTE/.test(firebaseConfig.apiKey);
 }
@@ -2705,6 +2722,17 @@ function initCloud(){
     console.warn('Cloud sync disabled: firebaseConfig still contains PASTE_ placeholders.');
     const w=document.getElementById('cloudWarn'); if(w) w.style.display='block';
     document.body.classList.remove('authLocked'); // never strand the user behind a blur
+    return;
+  }
+  // The SDK is deferred, so it can legitimately be missing here if the CDN
+  // was unreachable. Config is valid but there's nothing to talk to, and in
+  // cloud mode nothing is held on the device to fall back to - so say that
+  // plainly rather than throwing and leaving a permanently blurred shell.
+  if(typeof firebase==='undefined'){
+    console.error('Firebase SDK failed to load.');
+    const w=document.getElementById('cloudWarn');
+    if(w){ w.textContent='Couldn’t load Firebase — check your connection and reload.'; w.style.display='block'; }
+    document.body.classList.remove('authLocked');
     return;
   }
   firebase.initializeApp(firebaseConfig);
@@ -2939,10 +2967,18 @@ function wireBankSync(){
   wireFeedSyncButton('ltSyncBtn','ltMsg','syncLatitudeNow');
 }
 
-wireAuthButtons();
-wireBankSync();
-wireBillAlertTestButton();
-initCloud();
+// Deferred scripts finish executing before DOMContentLoaded fires, so this is
+// the earliest point where the Firebase globals are guaranteed present. This
+// inline script runs during parsing (inline scripts can't be deferred), so
+// calling initCloud() directly here would race the SDK and always lose.
+function boot(){
+  wireAuthButtons();
+  wireBankSync();
+  wireBillAlertTestButton();
+  initCloud();
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+else boot();
 
 </script>
 </body>
