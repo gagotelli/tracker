@@ -3089,6 +3089,17 @@ function fc(){
   const f=data.forecast, d=fcDefault();
   Object.keys(d).forEach(k=>{ if(f[k]==null) f[k]=d[k]; });
   if(!f.firstPay || typeof f.firstPay!=='object') f.firstPay={date:'',amount:0};
+  // One-off (Oct 2026): the car loan application moved to January, once three
+  // months of payslips exist. Shift a car loan still set to start in Dec 2026
+  // to the first fortnight after the 13 Jan 2027 payday. Runs once per plan.
+  if(!f.moved && Array.isArray(f.recurring)){
+    let changed=false;
+    f.recurring.forEach(r=>{
+      if(/car\s*loan/i.test(r.name||'') && r.date && r.date<'2027-01-01'){ r.date='2027-01-27'; changed=true; }
+    });
+    f.moved=true;
+    if(changed) setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
