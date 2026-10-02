@@ -486,7 +486,8 @@ input[type=number],input[type=date]{font-family:var(--mono)}
 @media(max-width:520px){.heroAmt{font-size:28px}}
 
 /* ===== FORECAST ===== */
-.fcKpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.fcDash{margin-bottom:16px}
+.fcKpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;padding-bottom:16px;border-bottom:1px solid var(--border)}
 .fcKpis>div{min-width:0}
 .fcWarn{margin-top:14px;color:var(--red)}
 .fcMiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;margin-top:16px}
@@ -534,7 +535,7 @@ input[type=number],input[type=date]{font-family:var(--mono)}
 .fcIcon:disabled{opacity:.35;cursor:default}
 .fcIO{width:100%;margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font-family:ui-monospace,Menlo,monospace;font-size:13px}
 @media(max-width:640px){
-  .fcKpis{grid-template-columns:1fr;gap:12px}
+  .fcKpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
   .fcMiles{grid-template-columns:1fr;gap:12px}
   .fcPay>summary{grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(0,1fr))}
   .fcFig{font-size:14px}.fcLeft{font-size:15px}
@@ -629,7 +630,6 @@ const firebaseConfig = {
   </div>
   <nav class="tabs">
     <button class="tab active" onclick="showTab('dashboard',this)">Dashboard</button>
-    <button class="tab" onclick="showTab('forecast',this)">Forecast</button>
     <button class="tab" onclick="showTab('payments',this)">Payments &amp; Setup</button>
   </nav>
 </header>
@@ -638,58 +638,34 @@ const firebaseConfig = {
 
   <section id="dashboard" class="page active">
 
-    <div class="grid" style="margin-bottom:16px">
-      <div class="card span12 fnCard">
-        <div class="fnHead">
-          <h2 class="section-title" style="margin:0">THIS FORTNIGHT</h2>
-          <span class="fnBadge" id="fnPaydayBadge"></span>
-        </div>
-
-        <div class="heroPanel" id="fnHeroPanel">
-          <div class="label">Safe to spend</div>
-          <div class="fnBig" id="fnSafe">$0.00</div>
-          <div class="fnSub"><b id="fnDaily">$0.00</b> a day for <span id="fnDays">14</span> days</div>
-          <div class="heroProgress" id="fnProgressTrack"><b id="fnProgressFill" style="width:0%"></b></div>
-        </div>
-
-        <div class="fnSecondary">
-          <div>
-            <div class="label">Available balance</div>
-            <div class="value" id="fnAvailable">$0.00</div>
-            <div class="fnSub" id="fnAvailableSub">Personal + cards</div>
-          </div>
-          <div>
-            <div class="label">Payday</div>
-            <div class="value" id="fnPayday"></div>
-            <div class="fnSub">then <span id="fnFollowing"></span></div>
-          </div>
-        </div>
-
-        <div class="acctMetrics" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);grid-template-columns:repeat(2,minmax(0,1fr))">
-          <div class="metric">
-            <div class="label">Set aside for bills</div>
-            <div class="value" id="fnSetAside">$0.00</div>
-          </div>
-          <div class="metric">
-            <div class="label">Savings goal</div>
-            <div class="value goal" id="fnSavingsGoal">$0.00</div>
-          </div>
-        </div>
-
-        <div class="fnGroup">
-          <div class="fnGroupHead"><span>Set aside for bills, every fortnight</span><b id="fnSetAsideSub">$0.00</b></div>
-          <details class="fnSettings" style="margin-top:10px">
-            <summary>Show the breakdown</summary>
-            <table class="table" style="margin-top:10px"><tbody id="fnSetAsideRows"></tbody></table>
-          </details>
-        </div>
-
-        <div class="fnGroup">
-          <div class="fnGroupHead"><span>Upcoming bills</span><b id="fnFixedSub">$0.00</b></div>
-          <table class="table"><tbody id="fnFixedRows"></tbody></table>
-        </div>
-
+    <div class="fcDash">
+    <div class="card" id="fcEmpty">
+      <h2 class="section-title">FORECAST</h2>
+      <p class="fnHelp">See every payday ahead: what comes out, which friend gets paid, how your card balances fall with interest, and what's left in your pocket. Paste your plan with <b>Import plan</b>, or start from the payments you already have.</p>
+      <div class="actions" style="margin-top:14px">
+        <button class="btn" type="button" onclick="fcGoSetup(true)">Import plan</button>
+        <button class="btn secondary" type="button" onclick="fcFromPayments();fcGoSetup(false)">Start from Payments &amp; Setup</button>
       </div>
+    </div>
+
+    <div id="fcMain" hidden>
+      <div class="card">
+        <h2 class="section-title">FORECAST</h2>
+        <div id="fcSummary"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="fcBar">
+          <h2 class="section-title" style="margin:0">PAYDAYS</h2>
+          <div class="fcBarRight">
+            <div class="pillToggle" id="fcViews"></div>
+            <button class="btn secondary" type="button" onclick="fcCopyText(this)">Copy as text</button>
+          </div>
+        </div>
+        <div id="fcRows" class="fcRows"></div>
+      </div>
+    </div>
+
     </div>
 
     <div class="grid" style="margin-bottom:16px">
@@ -789,6 +765,53 @@ const firebaseConfig = {
   </section>
 
   <section id="payments" class="page">
+    <details class="card fcSetupCard" id="fcSetup" style="margin-bottom:16px">
+      <summary><span class="section-title" style="margin:0">SETUP</span><span class="fnSub" id="fcCounts"></span></summary>
+
+      <div class="fnSubhead">Pay and rules</div>
+      <div class="profileBox" style="margin-top:12px">
+        <label>First payday<input id="fcFirstDate" type="date" onchange="fcSetPlan('firstDate',this)"><span class="fnHint">Every payday after is 14 days apart</span></label>
+        <label>First pay amount<input id="fcFirstAmt" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('firstAmt',this)"><span class="fnHint">If the first pay is different, like a one week pay</span></label>
+        <label>Pay each fortnight<input id="fcIncome" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('income',this)"><span class="fnHint">After tax</span></label>
+        <label>Keep at least, each fortnight<input id="fcMin" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('minPocket',this)"><span class="fnHint">Food, fuel, going out. Friends and extras only get paid above this.</span></label>
+        <label>Spare money goes to
+          <select id="fcSpare" onchange="fcSetPlan('spare',this)">
+            <option value="cards">Cards first, then savings</option>
+            <option value="savings">Savings</option>
+            <option value="pocket">Stays in my pocket</option>
+          </select>
+          <span class="fnHint">Cards go highest interest first</span></label>
+        <label>Move spare money in steps of<input id="fcRoundTo" type="number" step="1" inputmode="numeric" onchange="fcSetPlan('roundTo',this)"><span class="fnHint">Small leftovers stay in your pocket</span></label>
+        <label>Forecast until<input id="fcUntil" type="date" onchange="fcSetPlan('until',this)"></label>
+      </div>
+
+      <div class="fnSubhead">Regular payments</div>
+      <p class="fnHelp">Rent, loans, subscriptions and savings. Friends get paid before savings, and savings is cut back if a payday would leave you under your minimum.</p>
+      <div id="fcEd-recurring"></div>
+
+      <div class="fnSubhead">One off payments</div>
+      <div id="fcEd-oneOffs"></div>
+
+      <div class="fnSubhead">Credit cards</div>
+      <p class="fnHelp">Update the balance and its date every few weeks from your banking apps. Interest is a monthly percentage: your CommBank charges were about 1.47%.</p>
+      <div id="fcEd-cards"></div>
+
+      <div class="fnSubhead">Friends, in the order you'll pay them</div>
+      <p class="fnHelp">One friend at a time, top to bottom. If their full payment doesn't fit, they wait for the next payday. Tick <b>Alongside queue</b> for someone you pay at the same time as the list, like Rafa.</p>
+      <div id="fcEd-friends"></div>
+
+      <details class="fnSettings" id="fcImportBox">
+        <summary>Import or copy the whole plan</summary>
+        <p class="fnHelp">Paste a plan here and press Import. It replaces the plan above and saves to your account.</p>
+        <textarea id="fcIO" class="fcIO" rows="6" placeholder="{ &quot;firstPay&quot;: … }"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn" type="button" onclick="fcImport()">Import plan</button>
+          <button class="btn secondary" type="button" onclick="fcExport(this)">Copy plan</button>
+          <button class="btn secondary" type="button" onclick="fcFromPayments()">Add from Payments &amp; Setup</button>
+        </div>
+        <span id="fcMsg" class="fnHint" hidden></span>
+      </details>
+    </details>
     <div class="grid">
       <div class="card span12">
         <h2 class="section-title">UPCOMING PAYMENTS</h2>
@@ -922,82 +945,6 @@ const firebaseConfig = {
     </div>
   </section>
 
-  <section id="forecast" class="page">
-    <div class="card" id="fcEmpty">
-      <h2 class="section-title">FORECAST</h2>
-      <p class="fnHelp">See every payday ahead: what comes out, which friend gets paid, how your card balances fall with interest, and what's left in your pocket. Paste your plan into <b>Import plan</b> under Setup below, or start from the payments you already have.</p>
-      <div class="actions" style="margin-top:14px">
-        <button class="btn" type="button" onclick="document.getElementById('fcSetup').open=true;document.getElementById('fcImportBox').open=true;document.getElementById('fcIO').focus()">Import plan</button>
-        <button class="btn secondary" type="button" onclick="fcFromPayments();document.getElementById('fcSetup').open=true">Start from Payments &amp; Setup</button>
-      </div>
-    </div>
-
-    <div id="fcMain" hidden>
-      <div class="card">
-        <h2 class="section-title">FORECAST</h2>
-        <div id="fcSummary"></div>
-      </div>
-
-      <div class="card" style="margin-top:16px">
-        <div class="fcBar">
-          <h2 class="section-title" style="margin:0">PAYDAYS</h2>
-          <div class="fcBarRight">
-            <div class="pillToggle" id="fcViews"></div>
-            <button class="btn secondary" type="button" onclick="fcCopyText(this)">Copy as text</button>
-          </div>
-        </div>
-        <div id="fcRows" class="fcRows"></div>
-      </div>
-    </div>
-
-    <details class="card fcSetupCard" id="fcSetup" style="margin-top:16px">
-      <summary><span class="section-title" style="margin:0">SETUP</span><span class="fnSub" id="fcCounts"></span></summary>
-
-      <div class="fnSubhead">Pay and rules</div>
-      <div class="profileBox" style="margin-top:12px">
-        <label>First payday<input id="fcFirstDate" type="date" onchange="fcSetPlan('firstDate',this)"><span class="fnHint">Every payday after is 14 days apart</span></label>
-        <label>First pay amount<input id="fcFirstAmt" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('firstAmt',this)"><span class="fnHint">If the first pay is different, like a one week pay</span></label>
-        <label>Pay each fortnight<input id="fcIncome" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('income',this)"><span class="fnHint">After tax</span></label>
-        <label>Keep at least, each fortnight<input id="fcMin" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('minPocket',this)"><span class="fnHint">Food, fuel, going out. Friends and extras only get paid above this.</span></label>
-        <label>Spare money goes to
-          <select id="fcSpare" onchange="fcSetPlan('spare',this)">
-            <option value="cards">Cards first, then savings</option>
-            <option value="savings">Savings</option>
-            <option value="pocket">Stays in my pocket</option>
-          </select>
-          <span class="fnHint">Cards go highest interest first</span></label>
-        <label>Move spare money in steps of<input id="fcRoundTo" type="number" step="1" inputmode="numeric" onchange="fcSetPlan('roundTo',this)"><span class="fnHint">Small leftovers stay in your pocket</span></label>
-        <label>Forecast until<input id="fcUntil" type="date" onchange="fcSetPlan('until',this)"></label>
-      </div>
-
-      <div class="fnSubhead">Regular payments</div>
-      <p class="fnHelp">Rent, loans, subscriptions and savings. Friends get paid before savings, and savings is cut back if a payday would leave you under your minimum.</p>
-      <div id="fcEd-recurring"></div>
-
-      <div class="fnSubhead">One off payments</div>
-      <div id="fcEd-oneOffs"></div>
-
-      <div class="fnSubhead">Credit cards</div>
-      <p class="fnHelp">Update the balance and its date every few weeks from your banking apps. Interest is a monthly percentage: your CommBank charges were about 1.47%.</p>
-      <div id="fcEd-cards"></div>
-
-      <div class="fnSubhead">Friends, in the order you'll pay them</div>
-      <p class="fnHelp">One friend at a time, top to bottom. If their full payment doesn't fit, they wait for the next payday. Tick <b>Alongside queue</b> for someone you pay at the same time as the list, like Rafa.</p>
-      <div id="fcEd-friends"></div>
-
-      <details class="fnSettings" id="fcImportBox">
-        <summary>Import or copy the whole plan</summary>
-        <p class="fnHelp">Paste a plan here and press Import. It replaces the plan above and saves to your account.</p>
-        <textarea id="fcIO" class="fcIO" rows="6" placeholder="{ &quot;firstPay&quot;: … }"></textarea>
-        <div class="actions" style="margin-top:10px">
-          <button class="btn" type="button" onclick="fcImport()">Import plan</button>
-          <button class="btn secondary" type="button" onclick="fcExport(this)">Copy plan</button>
-          <button class="btn secondary" type="button" onclick="fcFromPayments()">Add from Payments &amp; Setup</button>
-        </div>
-        <span id="fcMsg" class="fnHint" hidden></span>
-      </details>
-    </details>
-  </section>
 
 </div>
 
@@ -3324,8 +3271,7 @@ function fcSetView(v){ fcView=v; renderForecast(); }
 const FC_GROUPS=['Bills','One off','Cards','Friends','Savings'];
 
 function renderForecast(){
-  const root=document.getElementById('forecast');
-  if(!root) return;
+  if(!document.getElementById('fcRows')) return;
   const plan=fc();
   const sim=fcSimulate(plan);
   const t=today();
@@ -3336,11 +3282,12 @@ function renderForecast(){
   renderForecastSetup(plan);
   if(!has) return;
 
+  const current=sim.rows.find(r=>r.end>=t);
+  const nextPay=sim.rows.find(r=>r.date>t);
   // Summary: when each debt is gone, and what the plan saves.
   const fmtWhen=m=>m.date?niceDate(m.date):'<span class="danger">'+money(m.left)+' left at the end</span>';
   const friendsRows=sim.milestones.filter(m=>m.kind==='Friend');
   const cardRows=sim.milestones.filter(m=>m.kind==='Card');
-  const lowest=sim.rows.filter(r=>r.date>=t).reduce((a,r)=>!a||r.left<a.left?r:a,null);
   const shortRows=sim.rows.filter(r=>r.date>=t && r.short);
   const debtFree=[...friendsRows,...cardRows].every(m=>m.date)
     ? new Date(Math.max(...[...friendsRows,...cardRows].map(m=>m.date.getTime()))) : null;
@@ -3348,9 +3295,10 @@ function renderForecast(){
 
   document.getElementById('fcSummary').innerHTML=`
     <div class="fcKpis">
+      ${current?`<div><div class="label">Left this fortnight</div><div class="value${current.short?' danger':''}">${money(current.left)}</div><div class="fnSub">from ${money(current.income)} on ${shortDate(current.date)}</div></div>`:''}
+      ${nextPay?`<div><div class="label">Next payday</div><div class="value">${shortDate(nextPay.date)}</div><div class="fnSub">${daysUntil(nextPay.date)===0?'today':daysUntil(nextPay.date)===1?'tomorrow':'in '+daysUntil(nextPay.date)+' days'} &middot; ${money(nextPay.income)}</div></div>`:''}
       <div><div class="label">Debt free</div><div class="value">${debtFree?niceDate(debtFree):'After '+niceDate(parseDate(plan.until))}</div></div>
       <div><div class="label">Saved by ${escHtml(niceDate(parseDate(plan.until)))}</div><div class="value">${money(sim.savedTotal)}</div></div>
-      <div><div class="label">Tightest payday ahead</div><div class="value${lowest&&lowest.short?' danger':''}">${lowest?money(lowest.left):'-'}</div><div class="fnSub">${lowest?niceDate(lowest.date):''}</div></div>
     </div>
     ${shortRows.length?`<div class="notice fcWarn">${shortRows.length} payday${shortRows.length>1?'s':''} ahead leave${shortRows.length>1?'':'s'} less than ${money(plan.minPocket)} in your pocket: ${shortRows.slice(0,4).map(r=>shortDate(r.date)).join(', ')}${shortRows.length>4?' and more':''}.</div>`:''}
     <div class="fcMiles">
@@ -3371,7 +3319,6 @@ function renderForecast(){
   if(!views.some(v=>v[0]===fcView)) fcView='next';
   document.getElementById('fcViews').innerHTML=views.map(([k,l])=>`<button type="button" class="${fcView===k?'active':''}" onclick="fcSetView('${k}')">${l}</button>`).join('');
 
-  const current=sim.rows.find(r=>r.end>=t);
   let shown=sim.rows;
   if(fcView==='next'){ const i=Math.max(0,sim.rows.indexOf(current)); shown=sim.rows.slice(i,i+6); }
   else if(fcView!=='all') shown=sim.rows.filter(r=>String(r.date.getFullYear())===fcView);
@@ -3400,6 +3347,12 @@ function renderForecast(){
   }).join('');
 }
 
+function fcGoSetup(importing){
+  const tab=[...document.querySelectorAll('.tab')].find(b=>/Payments/.test(b.textContent));
+  if(tab) showTab('payments',tab);
+  const setup=document.getElementById('fcSetup'); if(setup){ setup.open=true; setup.scrollIntoView({behavior:'smooth',block:'start'}); }
+  if(importing){ const box=document.getElementById('fcImportBox'); if(box) box.open=true; const ta=document.getElementById('fcIO'); if(ta) setTimeout(()=>ta.focus(),300); }
+}
 function fcToggleDone(key,on){ const p=fc(); if(on) p.done[key]=true; else delete p.done[key]; save(); }
 
 // Plain text of the shown paydays, in the same style as a Notes list.
