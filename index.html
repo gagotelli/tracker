@@ -484,6 +484,62 @@ input[type=number],input[type=date]{font-family:var(--mono)}
 .glance{background:var(--soft);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
 .gval{font-size:20px;font-weight:800;margin-top:6px;letter-spacing:-.01em}
 @media(max-width:520px){.heroAmt{font-size:28px}}
+
+/* ===== FORECAST ===== */
+.fcKpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.fcKpis>div{min-width:0}
+.fcWarn{margin-top:14px;color:var(--red)}
+.fcMiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;margin-top:16px}
+.fcMiles>div{min-width:0}
+.fcMile{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+.fcMile span{min-width:0}
+.fcMile small{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.fcMile b{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.fcBar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.fcBarRight{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.fcRows{border-top:1px solid var(--border)}
+.fcPay{border-bottom:1px solid var(--border)}
+.fcPay>summary{list-style:none;display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:10px;align-items:center;padding:14px 4px;cursor:pointer}
+.fcPay>summary::-webkit-details-marker{display:none}
+.fcPay>summary:focus-visible{outline:2px solid var(--text);outline-offset:-2px;border-radius:8px}
+.fcPay.past>summary{opacity:.55}
+.fcPay.now>summary{background:var(--soft);border-radius:10px}
+.fcDate{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;min-width:0}
+.fcDate .pill{padding:3px 9px;font-size:11px}
+.fcFig{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px}
+.fcFig small{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.fcLeft{font-size:17px}
+.fcBody{padding:2px 4px 16px}
+.fcTable td{padding:8px 6px;font-size:14px}
+.fcTable td small{display:block;font-size:11px;color:var(--muted)}
+.fcGroup td{padding:14px 6px 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:0}
+.fcWhen{color:var(--muted);white-space:nowrap;width:5.5em}
+.fcAmt{text-align:right;font-weight:600;white-space:nowrap;width:7em}
+.fcSkip td{color:var(--muted);text-decoration:line-through}
+.fcSkip td small{text-decoration:none}
+.fcBal{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;padding:10px 12px;background:var(--soft);border-radius:10px;font-size:12px;color:var(--muted)}
+.fcBal b{color:var(--text);font-variant-numeric:tabular-nums}
+.fcDone{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--muted);cursor:pointer}
+.fcSetupCard>summary{list-style:none;display:flex;justify-content:space-between;align-items:baseline;gap:12px;cursor:pointer;flex-wrap:wrap}
+.fcSetupCard>summary::-webkit-details-marker{display:none}
+.fcSetupCard>summary .section-title::after{content:' +';color:var(--muted)}
+.fcSetupCard[open]>summary .section-title::after{content:' −'}
+.fcEdWrap{overflow-x:auto;margin-top:10px;-webkit-overflow-scrolling:touch}
+.fcEd th small{display:block;text-transform:none;letter-spacing:0;font-weight:400}
+.fcEd td{padding:6px 4px;border-bottom:1px solid var(--border)}
+.fcEd input:not([type=checkbox]),.fcEd select{padding:8px 9px;font-size:14px;width:100%;min-width:7.5em}
+.fcEd input[type=checkbox]{width:18px;height:18px;accent-color:var(--text)}
+.fcOrder{white-space:nowrap}
+.fcIcon{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:13px}
+.fcIcon:disabled{opacity:.35;cursor:default}
+.fcIO{width:100%;margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font-family:ui-monospace,Menlo,monospace;font-size:13px}
+@media(max-width:640px){
+  .fcKpis{grid-template-columns:1fr;gap:12px}
+  .fcMiles{grid-template-columns:1fr;gap:12px}
+  .fcPay>summary{grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(0,1fr))}
+  .fcFig{font-size:14px}.fcLeft{font-size:15px}
+  .fcWhen{width:auto}
+}
 </style>
 <!-- ===== FIREBASE (cloud sync) =====
      All four are deferred: together they're roughly 600KB, and without defer
@@ -573,6 +629,7 @@ const firebaseConfig = {
   </div>
   <nav class="tabs">
     <button class="tab active" onclick="showTab('dashboard',this)">Dashboard</button>
+    <button class="tab" onclick="showTab('forecast',this)">Forecast</button>
     <button class="tab" onclick="showTab('payments',this)">Payments &amp; Setup</button>
   </nav>
 </header>
@@ -863,6 +920,83 @@ const firebaseConfig = {
         <button class="btn danger" onclick="resetCurrentProfile()">Clear all data</button>
       </div>
     </div>
+  </section>
+
+  <section id="forecast" class="page">
+    <div class="card" id="fcEmpty">
+      <h2 class="section-title">FORECAST</h2>
+      <p class="fnHelp">See every payday ahead: what comes out, which friend gets paid, how your card balances fall with interest, and what's left in your pocket. Paste your plan into <b>Import plan</b> under Setup below, or start from the payments you already have.</p>
+      <div class="actions" style="margin-top:14px">
+        <button class="btn" type="button" onclick="document.getElementById('fcSetup').open=true;document.getElementById('fcImportBox').open=true;document.getElementById('fcIO').focus()">Import plan</button>
+        <button class="btn secondary" type="button" onclick="fcFromPayments();document.getElementById('fcSetup').open=true">Start from Payments &amp; Setup</button>
+      </div>
+    </div>
+
+    <div id="fcMain" hidden>
+      <div class="card">
+        <h2 class="section-title">FORECAST</h2>
+        <div id="fcSummary"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="fcBar">
+          <h2 class="section-title" style="margin:0">PAYDAYS</h2>
+          <div class="fcBarRight">
+            <div class="pillToggle" id="fcViews"></div>
+            <button class="btn secondary" type="button" onclick="fcCopyText(this)">Copy as text</button>
+          </div>
+        </div>
+        <div id="fcRows" class="fcRows"></div>
+      </div>
+    </div>
+
+    <details class="card fcSetupCard" id="fcSetup" style="margin-top:16px">
+      <summary><span class="section-title" style="margin:0">SETUP</span><span class="fnSub" id="fcCounts"></span></summary>
+
+      <div class="fnSubhead">Pay and rules</div>
+      <div class="profileBox" style="margin-top:12px">
+        <label>First payday<input id="fcFirstDate" type="date" onchange="fcSetPlan('firstDate',this)"><span class="fnHint">Every payday after is 14 days apart</span></label>
+        <label>First pay amount<input id="fcFirstAmt" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('firstAmt',this)"><span class="fnHint">If the first pay is different, like a one week pay</span></label>
+        <label>Pay each fortnight<input id="fcIncome" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('income',this)"><span class="fnHint">After tax</span></label>
+        <label>Keep at least, each fortnight<input id="fcMin" type="number" step="0.01" inputmode="decimal" onchange="fcSetPlan('minPocket',this)"><span class="fnHint">Food, fuel, going out. Friends and extras only get paid above this.</span></label>
+        <label>Spare money goes to
+          <select id="fcSpare" onchange="fcSetPlan('spare',this)">
+            <option value="cards">Cards first, then savings</option>
+            <option value="savings">Savings</option>
+            <option value="pocket">Stays in my pocket</option>
+          </select>
+          <span class="fnHint">Cards go highest interest first</span></label>
+        <label>Move spare money in steps of<input id="fcRoundTo" type="number" step="1" inputmode="numeric" onchange="fcSetPlan('roundTo',this)"><span class="fnHint">Small leftovers stay in your pocket</span></label>
+        <label>Forecast until<input id="fcUntil" type="date" onchange="fcSetPlan('until',this)"></label>
+      </div>
+
+      <div class="fnSubhead">Regular payments</div>
+      <p class="fnHelp">Rent, loans, subscriptions and savings. Friends get paid before savings, and savings is cut back if a payday would leave you under your minimum.</p>
+      <div id="fcEd-recurring"></div>
+
+      <div class="fnSubhead">One off payments</div>
+      <div id="fcEd-oneOffs"></div>
+
+      <div class="fnSubhead">Credit cards</div>
+      <p class="fnHelp">Update the balance and its date every few weeks from your banking apps. Interest is a monthly percentage: your CommBank charges were about 1.47%.</p>
+      <div id="fcEd-cards"></div>
+
+      <div class="fnSubhead">Friends, in the order you'll pay them</div>
+      <p class="fnHelp">One friend at a time, top to bottom. If their full payment doesn't fit, they wait for the next payday. Tick <b>Alongside queue</b> for someone you pay at the same time as the list, like Rafa.</p>
+      <div id="fcEd-friends"></div>
+
+      <details class="fnSettings" id="fcImportBox">
+        <summary>Import or copy the whole plan</summary>
+        <p class="fnHelp">Paste a plan here and press Import. It replaces the plan above and saves to your account.</p>
+        <textarea id="fcIO" class="fcIO" rows="6" placeholder="{ &quot;firstPay&quot;: … }"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn" type="button" onclick="fcImport()">Import plan</button>
+          <button class="btn secondary" type="button" onclick="fcExport(this)">Copy plan</button>
+          <button class="btn secondary" type="button" onclick="fcFromPayments()">Add from Payments &amp; Setup</button>
+        </div>
+        <span id="fcMsg" class="fnHint" hidden></span>
+      </details>
+    </details>
   </section>
 
 </div>
@@ -1648,6 +1782,7 @@ function render(){
     const upcoming=data.bills.map((b,i)=>({...b,i,next:nextDate(b)})).sort((a,b)=>a.next-b.next);
 
     renderFortnight();
+    try{ renderForecast(); }catch(e){ console.error('forecast render failed', e); }
     renderSpendChart();
 
     accounts.innerHTML=data.accounts.map(a=>{
@@ -2985,6 +3120,411 @@ function boot(){
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
 else boot();
+
+
+/* ===================== FORECAST =====================
+   A payday-by-payday plan: every fortnight's pay, what comes out of it,
+   friend repayments in priority order, credit card balances with interest,
+   and what's left in your pocket. The plan itself lives in data.forecast,
+   so it syncs to Firestore with everything else. This file is public on
+   GitHub, so real figures must never be hard-coded here: the plan arrives
+   only through the Setup editor or the Import box. */
+
+function fcDefault(){
+  return {
+    firstPay:{date:'',amount:0}, income:0, minPocket:600, until:'2027-12-31',
+    spare:'cards', roundTo:50,
+    recurring:[], oneOffs:[], cards:[], friends:[], done:{}
+  };
+}
+function fc(){
+  if(!data.forecast || typeof data.forecast!=='object') data.forecast=fcDefault();
+  const f=data.forecast, d=fcDefault();
+  Object.keys(d).forEach(k=>{ if(f[k]==null) f[k]=d[k]; });
+  if(!f.firstPay || typeof f.firstPay!=='object') f.firstPay={date:'',amount:0};
+  return f;
+}
+const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
+const fcRound=n=>Math.round(n*100)/100;
+
+function fcAddMonths(base,n){
+  const x=new Date(base.getFullYear(), base.getMonth()+n, 1);
+  const last=new Date(x.getFullYear(), x.getMonth()+1, 0).getDate();
+  x.setDate(Math.min(base.getDate(), last));
+  return x;
+}
+// k-th occurrence counted from the first date, so a bill on the 31st stays
+// on the last day of short months instead of drifting forward.
+function fcOccurrence(base,every,k){
+  if(every==='Weekly'){ const x=new Date(base); x.setDate(x.getDate()+7*k); return x; }
+  if(every==='Fortnightly'){ const x=new Date(base); x.setDate(x.getDate()+14*k); return x; }
+  if(every==='Every 6 months') return fcAddMonths(base,6*k);
+  if(every==='Yearly') return fcAddMonths(base,12*k);
+  return fcAddMonths(base,k); // Monthly
+}
+function fcDueIn(item,from,to){
+  if(!item.date) return [];
+  const base=parseDate(item.date), end=item.until?parseDate(item.until):null, out=[];
+  for(let k=0;k<2000;k++){
+    const d=fcOccurrence(base,item.every||'Monthly',k);
+    if(d>to || (end && d>end)) break;
+    if(d>=from) out.push(d);
+  }
+  return out;
+}
+
+// Runs the whole plan. Pure: reads the plan, returns rows, touches nothing.
+function fcSimulate(plan){
+  const rows=[];
+  if(!plan.firstPay.date) return {rows, milestones:[]};
+  const first=parseDate(plan.firstPay.date);
+  const until=parseDate(plan.until||'2027-12-31');
+  const minPocket=fcNum(plan.minPocket);
+  const roundTo=Math.max(1,fcNum(plan.roundTo)||1);
+
+  const cards=(plan.cards||[]).map((c,i)=>({i, name:c.name||'Card '+(i+1),
+    bal:fcNum(c.balance), asOf:c.asOf?parseDate(c.asOf):first, live:false,
+    rate:fcNum(c.rate), day:Math.min(31,Math.max(1,fcNum(c.interestDay)||1)),
+    pay:fcNum(c.payment), start:c.start?parseDate(c.start):first, every:c.every||'Fortnightly',
+    paidOff:null, interestTotal:0}));
+  const friends=(plan.friends||[]).map((f,i)=>({i, name:f.name||'Friend '+(i+1), note:f.note||'',
+    rem:fcNum(f.amount), asOf:f.asOf?parseDate(f.asOf):first, live:false,
+    cap:fcNum(f.cap)||250, start:f.start?parseDate(f.start):first, parallel:!!f.parallel, paidOff:null}));
+
+  let savedTotal=0;
+  const savedByYear={};
+
+  for(let p=new Date(first), n=0; p<=until && n<300; n++){
+    const next=new Date(p); next.setDate(next.getDate()+14);
+    const end=new Date(next); end.setDate(end.getDate()-1);
+    const income=n===0 && fcNum(plan.firstPay.amount) ? fcNum(plan.firstPay.amount) : fcNum(plan.income);
+    const lines=[];
+
+    // Bring tracked balances in once their "as of" date has arrived.
+    cards.forEach(c=>{ if(!c.live && c.asOf<=end) c.live=true; });
+    friends.forEach(f=>{ if(!f.live && f.asOf<=end) f.live=true; });
+
+    // 1. Bills and fixed payments due before the next payday.
+    let bills=0, savingsPlanned=[];
+    (plan.recurring||[]).forEach(r=>{
+      fcDueIn(r,p,end).forEach(d=>{
+        const amt=fcNum(r.amount);
+        if(r.type==='Savings') savingsPlanned.push({name:r.name||'Savings', amt, d});
+        else { bills+=amt; lines.push({g:'Bills', name:r.name||'Bill', amt, d}); }
+      });
+    });
+    (plan.oneOffs||[]).forEach(o=>{
+      if(!o.date) return;
+      const d=parseDate(o.date);
+      if(d>=p && d<=end){ const amt=fcNum(o.amount); bills+=amt; lines.push({g:'One off', name:o.name||'One off', amt, d}); }
+    });
+
+    // 2. Regular card repayments, never more than what's owed.
+    let cardPays=0;
+    cards.forEach(c=>{
+      if(!c.pay || c.start>end) return;
+      fcDueIn({date:iso(c.start), every:c.every},p,end).forEach(d=>{
+        let amt=c.pay;
+        if(c.live){ amt=Math.min(amt, Math.max(0,c.bal)); c.bal=fcRound(c.bal-amt); }
+        if(amt>0){ cardPays+=amt; lines.push({g:'Cards', name:c.name, amt, d}); }
+      });
+    });
+
+    // 3. Friends come before savings. Parallel ones first (each up to its own
+    // cap), then the priority list one at a time. A friend whose full payment
+    // doesn't fit waits for the next payday, and nobody behind them jumps
+    // the queue.
+    let left=income-bills-cardPays;
+    let room=left-minPocket, friendPays=0;
+    const payFriend=f=>{
+      const amt=Math.min(f.cap, f.rem);
+      if(amt<=0 || amt>room+0.005) return false;
+      f.rem=fcRound(f.rem-amt); room-=amt; friendPays+=amt;
+      lines.push({g:'Friends', name:f.name, amt, d:p, note:f.rem<=0?'final':''});
+      if(f.rem<=0) f.paidOff=new Date(p);
+      return true;
+    };
+    friends.filter(f=>f.parallel && f.live && f.rem>0 && f.start<=end).forEach(payFriend);
+    for(const f of friends.filter(f=>!f.parallel && f.live)){
+      if(f.rem<=0) continue;
+      if(f.start>end) break;
+      if(!payFriend(f) || f.rem>0) break;
+    }
+
+    // 4. Savings from what's left above the minimum, cut back if it won't fit.
+    let savings=0;
+    savingsPlanned.forEach(s=>{
+      const amt=fcRound(Math.max(0,Math.min(s.amt, room)));
+      room-=amt; savings+=amt;
+      lines.push({g:'Savings', name:s.name, amt, d:s.d,
+        note:amt<=0?'skipped to keep your minimum':amt<s.amt?'cut from '+money(s.amt)+' to keep your minimum':''});
+    });
+
+    // 5. Whatever is spare above the minimum.
+    let extra=0, extraSaved=0;
+    const owingCards=cards.filter(c=>c.live && c.bal>0.005);
+    if(plan.spare!=='pocket' && room>=roundTo){
+      let pot=Math.floor(room/roundTo)*roundTo;
+      if(plan.spare==='cards' && owingCards.length){
+        owingCards.sort((a,b)=>b.rate-a.rate || a.bal-b.bal).forEach(c=>{
+          if(pot<=0) return;
+          const amt=Math.min(pot, c.bal);
+          c.bal=fcRound(c.bal-amt); pot-=amt; extra+=amt; room-=amt;
+          lines.push({g:'Cards', name:c.name+' extra', amt, d:p});
+        });
+      }
+      if(pot>0 && (plan.spare==='savings' || !owingCards.some(c=>c.bal>0.005))){
+        extraSaved=pot; room-=pot; savings+=pot;
+        lines.push({g:'Savings', name:'Spare money', amt:pot, d:p});
+      }
+    }
+
+    // 6. Interest lands on its day within this pay cycle, after the payments.
+    const interest=[];
+    cards.forEach(c=>{
+      if(!c.live || !c.rate || c.bal<=0.005) return;
+      for(let m=0;m<2;m++){
+        const y=p.getFullYear(), mo=p.getMonth()+m;
+        const last=new Date(y, mo+1, 0).getDate();
+        const d=new Date(y, mo, Math.min(c.day,last));
+        if(d>=p && d<=end){
+          const amt=fcRound(c.bal*c.rate/100);
+          c.bal=fcRound(c.bal+amt); c.interestTotal+=amt;
+          interest.push({name:c.name, amt, d});
+        }
+      }
+    });
+    cards.forEach(c=>{ if(c.live && c.bal<=0.005 && !c.paidOff){ c.bal=0; c.paidOff=new Date(p); } });
+
+    savedTotal+=savings;
+    savedByYear[p.getFullYear()]=(savedByYear[p.getFullYear()]||0)+savings;
+    const out=bills+cardPays+savings+friendPays+extra;
+    rows.push({
+      date:new Date(p), end:new Date(end), key:iso(p), income, lines, interest,
+      bills, cardPays, savings, friendPays, extra,
+      out:fcRound(out), left:fcRound(income-out), short:income-out<minPocket-0.005,
+      balances:cards.filter(c=>c.live).map(c=>({name:c.name, bal:c.bal})),
+      savedTotal:fcRound(savedTotal)
+    });
+    p=next;
+  }
+
+  const milestones=[];
+  friends.forEach(f=>milestones.push({kind:'Friend', name:f.name, note:f.note,
+    date:f.paidOff, left:f.rem}));
+  cards.forEach(c=>milestones.push({kind:'Card', name:c.name, date:c.paidOff, left:c.bal,
+    interest:c.interestTotal, hasRate:!!c.rate}));
+  return {rows, milestones, savedTotal:fcRound(savedTotal), savedByYear};
+}
+
+/* ---------- view ---------- */
+let fcView='next';
+function fcSetView(v){ fcView=v; renderForecast(); }
+
+const FC_GROUPS=['Bills','One off','Cards','Friends','Savings'];
+
+function renderForecast(){
+  const root=document.getElementById('forecast');
+  if(!root) return;
+  const plan=fc();
+  const sim=fcSimulate(plan);
+  const t=today();
+  const has=sim.rows.length>0;
+
+  document.getElementById('fcEmpty').hidden=has;
+  document.getElementById('fcMain').hidden=!has;
+  renderForecastSetup(plan);
+  if(!has) return;
+
+  // Summary: when each debt is gone, and what the plan saves.
+  const fmtWhen=m=>m.date?niceDate(m.date):'<span class="danger">'+money(m.left)+' left at the end</span>';
+  const friendsRows=sim.milestones.filter(m=>m.kind==='Friend');
+  const cardRows=sim.milestones.filter(m=>m.kind==='Card');
+  const lowest=sim.rows.filter(r=>r.date>=t).reduce((a,r)=>!a||r.left<a.left?r:a,null);
+  const shortRows=sim.rows.filter(r=>r.date>=t && r.short);
+  const debtFree=[...friendsRows,...cardRows].every(m=>m.date)
+    ? new Date(Math.max(...[...friendsRows,...cardRows].map(m=>m.date.getTime()))) : null;
+  const years=Object.keys(sim.savedByYear).sort();
+
+  document.getElementById('fcSummary').innerHTML=`
+    <div class="fcKpis">
+      <div><div class="label">Debt free</div><div class="value">${debtFree?niceDate(debtFree):'After '+niceDate(parseDate(plan.until))}</div></div>
+      <div><div class="label">Saved by ${escHtml(niceDate(parseDate(plan.until)))}</div><div class="value">${money(sim.savedTotal)}</div></div>
+      <div><div class="label">Tightest payday ahead</div><div class="value${lowest&&lowest.short?' danger':''}">${lowest?money(lowest.left):'-'}</div><div class="fnSub">${lowest?niceDate(lowest.date):''}</div></div>
+    </div>
+    ${shortRows.length?`<div class="notice fcWarn">${shortRows.length} payday${shortRows.length>1?'s':''} ahead leave${shortRows.length>1?'':'s'} less than ${money(plan.minPocket)} in your pocket: ${shortRows.slice(0,4).map(r=>shortDate(r.date)).join(', ')}${shortRows.length>4?' and more':''}.</div>`:''}
+    <div class="fcMiles">
+      <div>
+        <div class="fnSubhead" style="margin-top:0;border-top:0;padding-top:0">Friends</div>
+        ${friendsRows.length?friendsRows.map(m=>`<div class="fcMile"><span>${escHtml(m.name)}${m.note?` <small>${escHtml(m.note)}</small>`:''}</span><b>${fmtWhen(m)}</b></div>`).join(''):'<div class="fnSub">None added.</div>'}
+      </div>
+      <div>
+        <div class="fnSubhead" style="margin-top:0;border-top:0;padding-top:0">Cards</div>
+        ${cardRows.length?cardRows.map(m=>`<div class="fcMile"><span>${escHtml(m.name)} <small>${m.hasRate?money(m.interest)+' interest':'no interest rate set'}</small></span><b>${fmtWhen(m)}</b></div>`).join(''):'<div class="fnSub">None added.</div>'}
+        ${years.length>1?`<div class="fnSubhead">Savings by year</div>${years.map(y=>`<div class="fcMile"><span>${y}</span><b>${money(sim.savedByYear[y])}</b></div>`).join('')}`:''}
+      </div>
+    </div>`;
+
+  // View filter.
+  const yrs=[...new Set(sim.rows.map(r=>r.date.getFullYear()))];
+  const views=[['next','Next 6'],...yrs.map(y=>[String(y),String(y)]),['all','All']];
+  if(!views.some(v=>v[0]===fcView)) fcView='next';
+  document.getElementById('fcViews').innerHTML=views.map(([k,l])=>`<button type="button" class="${fcView===k?'active':''}" onclick="fcSetView('${k}')">${l}</button>`).join('');
+
+  const current=sim.rows.find(r=>r.end>=t);
+  let shown=sim.rows;
+  if(fcView==='next'){ const i=Math.max(0,sim.rows.indexOf(current)); shown=sim.rows.slice(i,i+6); }
+  else if(fcView!=='all') shown=sim.rows.filter(r=>String(r.date.getFullYear())===fcView);
+
+  document.getElementById('fcRows').innerHTML=shown.map(r=>{
+    const isNow=r===current, past=r.end<t, done=!!plan.done[r.key];
+    const groups=FC_GROUPS.map(g=>{
+      const ls=r.lines.filter(l=>l.g===g);
+      if(!ls.length) return '';
+      return `<tr class="fcGroup"><td colspan="3">${g}</td></tr>`+ls.map(l=>`<tr${l.amt===0?' class="fcSkip"':''}><td>${escHtml(l.name)}${l.note?`<small>${escHtml(l.note)}</small>`:''}</td><td class="fcWhen">${shortDate(l.d)}</td><td class="fcAmt">${money(l.amt)}</td></tr>`).join('');
+    }).join('');
+    const bal=r.balances.length?`<div class="fcBal">${r.interest.map(x=>`<span>${escHtml(x.name)} interest ${shortDate(x.d)} <b>+${money(x.amt)}</b></span>`).join('')}${r.balances.map(b=>`<span>${escHtml(b.name)} after <b>${b.bal>0?money(b.bal):'paid off'}</b></span>`).join('')}</div>`:'';
+    return `<details class="fcPay${past?' past':''}${isNow?' now':''}"${isNow?' open':''}>
+      <summary>
+        <span class="fcDate"><b>${r.date.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</b>${isNow?'<span class="fnBadge">This pay</span>':''}${done?'<span class="pill ok">Done</span>':''}</span>
+        <span class="fcFig"><small>In</small>${money(r.income)}</span>
+        <span class="fcFig hideMobile"><small>Out</small>${money(r.out)}</span>
+        <span class="fcFig fcLeft${r.short?' danger':''}"><small>Left</small>${money(r.left)}</span>
+      </summary>
+      <div class="fcBody">
+        <table class="table fcTable"><tbody>${groups||'<tr><td>Nothing due this fortnight.</td></tr>'}</tbody></table>
+        ${bal}
+        <label class="fnCheck fcDone"><input type="checkbox" id="fcDone-${r.key}" ${done?'checked':''} onchange="fcToggleDone('${r.key}',this.checked)"> Everything for this payday is paid</label>
+      </div>
+    </details>`;
+  }).join('');
+}
+
+function fcToggleDone(key,on){ const p=fc(); if(on) p.done[key]=true; else delete p.done[key]; save(); }
+
+// Plain text of the shown paydays, in the same style as a Notes list.
+function fcCopyText(btn){
+  const plan=fc(), sim=fcSimulate(plan), t=today();
+  const current=sim.rows.find(r=>r.end>=t);
+  let shown=sim.rows;
+  if(fcView==='next'){ const i=Math.max(0,sim.rows.indexOf(current)); shown=sim.rows.slice(i,i+6); }
+  else if(fcView!=='all') shown=sim.rows.filter(r=>String(r.date.getFullYear())===fcView);
+  const text=shown.map(r=>{
+    const head=`📆 ${r.date.getDate()} ${MON[r.date.getMonth()].toUpperCase()} ${r.date.getFullYear()} (in ${money(r.income)})`;
+    const ls=r.lines.filter(l=>l.amt>0).map(l=>`${l.g==='Friends'?'🤝 ':''}${l.name}${l.note==='final'?' (final)':''} ${money(l.amt)}`);
+    const bal=r.balances.map(b=>`💳 ${b.name}: ${b.bal>0?money(b.bal):'paid off'}`);
+    return [head,...ls,`👉 TOTAL ${money(r.out)} / LEFT ${money(r.left)}`,...bal].join('\n');
+  }).join('\n\n');
+  fcCopy(text,btn,'Copied');
+}
+function fcCopy(text,btn,ok){
+  const done=()=>{ if(btn){ const o=btn.textContent; btn.textContent=ok; setTimeout(()=>btn.textContent=o,1600);} };
+  const fallback=()=>{ const ta=document.getElementById('fcIO'); if(ta){ ta.value=text; ta.closest('details').open=true; ta.focus(); ta.select(); } };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done,fallback);
+  else fallback();
+}
+
+/* ---------- setup editor ---------- */
+const FC_EVERY=['Fortnightly','Monthly','Weekly','Every 6 months','Yearly'];
+const FC_COLS={
+  recurring:[
+    {k:'name',l:'Name',t:'text',w:'14em'},{k:'amount',l:'Amount',t:'number'},
+    {k:'every',l:'Repeats',t:'select',o:FC_EVERY},{k:'date',l:'First date',t:'date'},
+    {k:'until',l:'Last date',t:'date',hint:'blank = no end'},{k:'type',l:'Type',t:'select',o:['Bill','Savings']}],
+  oneOffs:[{k:'name',l:'Name',t:'text',w:'14em'},{k:'amount',l:'Amount',t:'number'},{k:'date',l:'Date',t:'date'}],
+  cards:[
+    {k:'name',l:'Card',t:'text',w:'12em'},{k:'balance',l:'Balance',t:'number'},{k:'asOf',l:'As of',t:'date'},
+    {k:'payment',l:'Repayment',t:'number'},{k:'every',l:'Repeats',t:'select',o:FC_EVERY},{k:'start',l:'First repayment',t:'date'},
+    {k:'rate',l:'Interest %/month',t:'number'},{k:'interestDay',l:'Interest day',t:'number'}],
+  friends:[
+    {k:'name',l:'Name',t:'text',w:'9em'},{k:'amount',l:'Owed (AUD)',t:'number'},{k:'note',l:'Note',t:'text',w:'9em'},
+    {k:'cap',l:'Max per pay',t:'number'},{k:'start',l:'Start',t:'date'},{k:'parallel',l:'Alongside queue',t:'check'},{k:'asOf',l:'As of',t:'date'}]
+};
+const FC_NEW={
+  recurring:()=>({name:'',amount:0,every:'Monthly',date:iso(today()),until:'',type:'Bill'}),
+  oneOffs:()=>({name:'',amount:0,date:iso(today())}),
+  cards:()=>({name:'',balance:0,asOf:iso(today()),payment:0,every:'Fortnightly',start:'',rate:0,interestDay:1}),
+  friends:()=>({name:'',amount:0,note:'',cap:250,start:'',parallel:false,asOf:''})
+};
+
+function fcEditor(key){
+  const plan=fc(), cols=FC_COLS[key], list=plan[key]||[];
+  const cell=(row,c,i)=>{
+    const id=`fc-${key}-${i}-${c.k}`, v=row[c.k];
+    const on=`onchange="fcSetField('${key}',${i},'${c.k}',this)"`;
+    if(c.t==='select') return `<select id="${id}" ${on}>${c.o.map(o=>`<option${o===(v||c.o[0])?' selected':''}>${o}</option>`).join('')}</select>`;
+    if(c.t==='check') return `<input type="checkbox" id="${id}" ${v?'checked':''} ${on}>`;
+    const val=v==null?'':escHtml(String(v));
+    return `<input id="${id}" type="${c.t}" ${c.t==='number'?'step="0.01" inputmode="decimal"':''} value="${val}" ${c.w?`style="min-width:${c.w}"`:''} ${on}>`;
+  };
+  const isFriends=key==='friends';
+  return `<div class="fcEdWrap"><table class="table fcEd">
+    <thead><tr>${isFriends?'<th></th>':''}${cols.map(c=>`<th>${c.l}${c.hint?`<small>${c.hint}</small>`:''}</th>`).join('')}<th></th></tr></thead>
+    <tbody>${list.length?list.map((row,i)=>`<tr>${isFriends?`<td class="fcOrder"><button type="button" class="fcIcon" title="Move up" aria-label="Move ${escHtml(row.name||'friend')} up" onclick="fcMove(${i},-1)" ${i===0?'disabled':''}>↑</button><button type="button" class="fcIcon" title="Move down" aria-label="Move ${escHtml(row.name||'friend')} down" onclick="fcMove(${i},1)" ${i===list.length-1?'disabled':''}>↓</button></td>`:''}${cols.map(c=>`<td>${cell(row,c,i)}</td>`).join('')}<td><button type="button" class="btn secondary" onclick="fcRemove('${key}',${i})">Remove</button></td></tr>`).join('')
+      :`<tr><td colspan="${cols.length+2}" class="fnSub">Nothing here yet.</td></tr>`}</tbody>
+  </table></div>
+  <div class="actions" style="margin-top:10px"><button type="button" class="btn secondary" onclick="fcAdd('${key}')">Add ${key==='recurring'?'a regular payment':key==='oneOffs'?'a one off':key==='cards'?'a card':'a friend'}</button></div>`;
+}
+
+function renderForecastSetup(plan){
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e && document.activeElement!==e) e.value=v; };
+  set('fcFirstDate',plan.firstPay.date||'');
+  set('fcFirstAmt',plan.firstPay.amount||'');
+  set('fcIncome',plan.income||'');
+  set('fcMin',plan.minPocket);
+  set('fcUntil',plan.until||'');
+  set('fcSpare',plan.spare||'cards');
+  set('fcRoundTo',plan.roundTo||50);
+  ['recurring','oneOffs','cards','friends'].forEach(k=>{ const e=document.getElementById('fcEd-'+k); if(e) e.innerHTML=fcEditor(k); });
+  const c=document.getElementById('fcCounts');
+  if(c) c.textContent=`${plan.recurring.length} regular, ${plan.oneOffs.length} one off, ${plan.cards.length} cards, ${plan.friends.length} friends`;
+}
+
+function fcSetPlan(field,el){
+  const p=fc(), v=el.value;
+  if(field==='firstDate') p.firstPay.date=v;
+  else if(field==='firstAmt') p.firstPay.amount=fcNum(v);
+  else if(field==='income'||field==='minPocket'||field==='roundTo') p[field]=fcNum(v);
+  else p[field]=v;
+  save();
+}
+function fcSetField(key,i,k,el){
+  const p=fc(), row=p[key][i]; if(!row) return;
+  const col=FC_COLS[key].find(c=>c.k===k);
+  row[k]=col.t==='check'?el.checked:col.t==='number'?fcNum(el.value):el.value;
+  save();
+}
+function fcAdd(key){ const p=fc(); p[key].push(FC_NEW[key]()); save(); }
+function fcRemove(key,i){ const p=fc(); p[key].splice(i,1); save(); }
+function fcMove(i,dir){ const p=fc(), j=i+dir; if(j<0||j>=p.friends.length) return; [p.friends[i],p.friends[j]]=[p.friends[j],p.friends[i]]; save(); }
+
+function fcFromPayments(){
+  const p=fc(), have=new Set(p.recurring.map(r=>normalise(r.name)));
+  let n=0;
+  (data.bills||[]).forEach(b=>{
+    if(have.has(normalise(b.description))) return;
+    p.recurring.push({name:b.description, amount:fcNum(b.amount), every:FC_EVERY.includes(b.repeat)?b.repeat:'Monthly', date:b.date||iso(today()), until:'', type:'Bill'});
+    n++;
+  });
+  fcMsg(n?`Added ${n} payment${n>1?'s':''} from Payments & Setup.`:'Everything from Payments & Setup is already in the plan.');
+  save();
+}
+function fcImport(){
+  const ta=document.getElementById('fcIO');
+  let obj;
+  try{ obj=JSON.parse(ta.value); }catch(e){ fcMsg('That text isn’t a valid plan. Paste the whole block, starting with { and ending with }.', true); return; }
+  if(!obj || typeof obj!=='object' || !obj.firstPay){ fcMsg('That text doesn’t look like a forecast plan.', true); return; }
+  const keepDone=fc().done;
+  data.forecast=Object.assign(fcDefault(), obj, {done:Object.assign({}, keepDone, obj.done||{})});
+  ta.value='';
+  fcMsg('Plan imported and saved to your account.');
+  save();
+}
+function fcExport(btn){
+  const text=JSON.stringify(fc(),null,1);
+  fcCopy(text,btn,'Plan copied');
+}
+function fcMsg(m,bad){ const e=document.getElementById('fcMsg'); if(!e) return; e.textContent=m; e.className='fnHint'+(bad?' bad':''); e.hidden=false; }
 
 </script>
 </body>
