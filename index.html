@@ -1229,11 +1229,24 @@ function applyV7Fixes(s){
   s.migrated = 7;
   return true;
 }
+// v8 (Oct 2026): fortnightly health insurance direct debit, first one 31 Oct.
+function applyV8Fixes(s){
+  if(Number(s.migrated) >= 8) return false;
+  Object.values(s.profiles || {}).forEach(p=>{
+    if(!Array.isArray(p.bills)) p.bills=[];
+    if(!p.bills.some(b=>/health/i.test(b.description||''))){
+      p.bills.push({description:'Health insurance',amount:57.55,date:'2026-10-31',repeat:'Fortnightly'});
+    }
+  });
+  s.migrated = 8;
+  return true;
+}
 function applyDataFixes(s){
   const a=applyV5Fixes(s);
   const b=applyV6Fixes(s);
   const c=applyV7Fixes(s);
-  return a || b || c;
+  const d=applyV8Fixes(s);
+  return a || b || c || d;
 }
 applyDataFixes(store);
 if(!CLOUD) localStorage.setItem(STORE_KEY, JSON.stringify(store));
@@ -3108,6 +3121,15 @@ function fc(){
       f.recurring.splice(i<0?f.recurring.length:i+1,0,{name:'Adobe',amount:24,every:'Monthly',date:'2026-11-03',until:'',type:'Bill'});
     }
     f.addedAdobe=true;
+    setTimeout(()=>saveStore(),0);
+  }
+  // One-off (Oct 2026): fortnightly health insurance, first debit 31 Oct.
+  if(!f.addedHealth && f.firstPay.date && Array.isArray(f.recurring)){
+    if(!f.recurring.some(r=>/health/i.test(r.name||''))){
+      const i=f.recurring.findIndex(r=>/motorbike loan/i.test(r.name||''));
+      f.recurring.splice(i<0?f.recurring.length:i+1,0,{name:'Health insurance',amount:57.55,every:'Fortnightly',date:'2026-10-31',until:'',type:'Bill'});
+    }
+    f.addedHealth=true;
     setTimeout(()=>saveStore(),0);
   }
   return f;
