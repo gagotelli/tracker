@@ -3211,6 +3211,17 @@ function fc(){
     f.firstPayV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): every Afterpay instalment due before the 21 Oct payday
+  // ($438.47, due 9 and 18 Oct) is paid from the 7 Oct pay, so the $55 moved
+  // to 21 Oct goes back. The 21 Oct amount covers the 1 Nov instalments.
+  if(!f.afterpayV2 && f.firstPay.date){
+    const ap=(f.oneOffs||[]).find(o=>o.name==='Afterpay' && o.date==='2026-10-07');
+    const apF=(f.oneOffs||[]).find(o=>o.name==='Afterpay (final)' && o.date==='2026-10-21');
+    if(ap) ap.amount=438.47;
+    if(apF && Number(apF.amount)===305.1) apF.amount=250.1;
+    f.afterpayV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
