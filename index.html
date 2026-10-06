@@ -1265,6 +1265,16 @@ function applyV10Fixes(s){
   s.migrated = 10;
   return true;
 }
+// v11 (Oct 2026): AC3 pays fortnightly on Wednesdays from 7 Oct, $3,372 net.
+function applyV11Fixes(s){
+  if(Number(s.migrated) >= 11) return false;
+  Object.values(s.profiles || {}).forEach(p=>{
+    if(!p.settings) p.settings={};
+    p.settings.fortnightlyIncome=3372;
+  });
+  s.migrated = 11;
+  return true;
+}
 function applyDataFixes(s){
   const a=applyV5Fixes(s);
   const b=applyV6Fixes(s);
@@ -1272,7 +1282,8 @@ function applyDataFixes(s){
   const d=applyV8Fixes(s);
   const e=applyV9Fixes(s);
   const g=applyV10Fixes(s);
-  return a || b || c || d || e || g;
+  const h=applyV11Fixes(s);
+  return a || b || c || d || e || g || h;
 }
 applyDataFixes(store);
 if(!CLOUD) localStorage.setItem(STORE_KEY, JSON.stringify(store));
@@ -1295,7 +1306,7 @@ const money = n => '$' + Number(n || 0).toLocaleString(undefined,{minimumFractio
 
 // Local date helpers. These avoid UTC date shifts on mobile browsers.
 const DAY_MS = 24 * 60 * 60 * 1000;
-const PAYDAY_ANCHOR = '2026-06-11'; // Your confirmed payday: Thu 11 Jun 2026.
+const PAYDAY_ANCHOR = '2026-10-07'; // AC3 payday: Wed 7 Oct 2026, then every 14 days.
 
 function today(){
   const d = new Date();
@@ -3190,6 +3201,14 @@ function fc(){
     const apF=(f.oneOffs||[]).find(o=>o.name==='Afterpay (final)' && o.date==='2026-10-21' && Number(o.amount)===250.1);
     if(ap && apF){ ap.amount=255; apF.amount=305.1; }
     f.addedQbe=true;
+    setTimeout(()=>saveStore(),0);
+  }
+  // One-off (Oct 2026): the 7 Oct pay came in at $3,963.69 (28 Sep to 13 Oct,
+  // 12 working days, partly in advance), not one week. Full fortnights after.
+  if(!f.firstPayV2 && f.firstPay.date==='2026-10-07'){
+    f.firstPay.amount=3963.69;
+    if(!fcNum(f.income)) f.income=3372;
+    f.firstPayV2=true;
     setTimeout(()=>saveStore(),0);
   }
   return f;
