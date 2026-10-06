@@ -1253,13 +1253,26 @@ function applyV9Fixes(s){
   s.migrated = 9;
   return true;
 }
+// v10 (Oct 2026): QBE motorbike insurance, $34 fortnightly.
+function applyV10Fixes(s){
+  if(Number(s.migrated) >= 10) return false;
+  Object.values(s.profiles || {}).forEach(p=>{
+    if(!Array.isArray(p.bills)) p.bills=[];
+    if(!p.bills.some(b=>/qbe/i.test(b.description||''))){
+      p.bills.push({description:'QBE motorbike insurance',amount:34,date:'2026-10-09',repeat:'Fortnightly'});
+    }
+  });
+  s.migrated = 10;
+  return true;
+}
 function applyDataFixes(s){
   const a=applyV5Fixes(s);
   const b=applyV6Fixes(s);
   const c=applyV7Fixes(s);
   const d=applyV8Fixes(s);
   const e=applyV9Fixes(s);
-  return a || b || c || d || e;
+  const g=applyV10Fixes(s);
+  return a || b || c || d || e || g;
 }
 applyDataFixes(store);
 if(!CLOUD) localStorage.setItem(STORE_KEY, JSON.stringify(store));
@@ -3164,6 +3177,19 @@ function fc(){
     const rank=x=>{ const i=order.indexOf(key(x.name)); return i<0?order.length:i; };
     f.friends=f.friends.map((x,i)=>({x,i})).sort((a,b)=>rank(a.x)-rank(b.x)||a.i-b.i).map(o=>o.x);
     f.friendsV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
+  // One-off (Oct 2026): QBE motorbike insurance $34 fortnightly, and $55 of
+  // the 7 Oct Afterpay payment moved to 21 Oct so the one week pay covers it.
+  if(!f.addedQbe && f.firstPay.date && Array.isArray(f.recurring)){
+    if(!f.recurring.some(r=>/qbe/i.test(r.name||''))){
+      const i=f.recurring.findIndex(r=>/motorbike loan/i.test(r.name||''));
+      f.recurring.splice(i<0?f.recurring.length:i+1,0,{name:'QBE motorbike insurance',amount:34,every:'Fortnightly',date:'2026-10-09',until:'',type:'Bill'});
+    }
+    const ap=(f.oneOffs||[]).find(o=>o.name==='Afterpay' && o.date==='2026-10-07' && Number(o.amount)===310);
+    const apF=(f.oneOffs||[]).find(o=>o.name==='Afterpay (final)' && o.date==='2026-10-21' && Number(o.amount)===250.1);
+    if(ap && apF){ ap.amount=255; apF.amount=305.1; }
+    f.addedQbe=true;
     setTimeout(()=>saveStore(),0);
   }
   return f;
