@@ -3154,6 +3154,18 @@ function fc(){
     f.addedRevenue=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): Tono is owed $1,600 and is paid alongside Rafa from
+  // 4 Nov; the queue after them is Natalie, then David, then Tia Tuti.
+  if(!f.friendsV2 && f.firstPay.date && Array.isArray(f.friends) && f.friends.length){
+    const key=n=>String(n||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const tono=f.friends.find(x=>key(x.name)==='tono');
+    if(tono){ tono.amount=1600; tono.parallel=true; tono.start='2026-11-04'; }
+    const order=['rafa','tono','miguel','natalie','david','tia tuti'];
+    const rank=x=>{ const i=order.indexOf(key(x.name)); return i<0?order.length:i; };
+    f.friends=f.friends.map((x,i)=>({x,i})).sort((a,b)=>rank(a.x)-rank(b.x)||a.i-b.i).map(o=>o.x);
+    f.friendsV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
