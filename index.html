@@ -3244,6 +3244,15 @@ function fc(){
     f.miguelV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): Gem interest from the 24 Sep statement: $7.16 on an
+  // average balance of about $7,820, so about 0.09% a month across the card.
+  // Interest lands on the statement date, the 24th.
+  if(!f.gemRateV2 && Array.isArray(f.cards)){
+    const g=f.cards.find(c=>/gem|latitude/i.test(c.name||''));
+    if(g && !fcNum(g.rate)){ g.rate=0.09; g.interestDay=24; }
+    f.gemRateV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
