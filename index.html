@@ -3222,6 +3222,20 @@ function fc(){
     f.afterpayV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): Afterpay owes $844.80 in total. After the $438.47 on
+  // 7 Oct: $167.59 due 1 to 6 Nov (paid 21 Oct), $238.74 due by early Dec
+  // (paid 4 Nov), which clears Afterpay.
+  if(!f.afterpayV3 && f.firstPay.date){
+    if(!Array.isArray(f.oneOffs)) f.oneOffs=[];
+    const apF=f.oneOffs.find(o=>o.name==='Afterpay (final)' && o.date==='2026-10-21');
+    if(apF){ apF.name='Afterpay'; apF.amount=167.59; }
+    else f.oneOffs.push({name:'Afterpay',amount:167.59,date:'2026-10-21'});
+    if(!f.oneOffs.some(o=>/afterpay/i.test(o.name||'') && o.date==='2026-11-04'))
+      f.oneOffs.push({name:'Afterpay (final)',amount:238.74,date:'2026-11-04'});
+    f.oneOffs.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    f.afterpayV3=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
