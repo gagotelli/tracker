@@ -3319,6 +3319,13 @@ function fc(){
     f.noBufferV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): both remaining StepPay DHgate payments are paid from
+  // the 21 Oct pay.
+  if(!f.stepPayV2 && Array.isArray(f.oneOffs)){
+    f.oneOffs.forEach(o=>{ if(/steppay dhgate/i.test(o.name||'') && (o.date==='2026-10-23'||o.date==='2026-11-06')) o.date='2026-10-21'; });
+    f.stepPayV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
