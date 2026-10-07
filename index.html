@@ -3296,6 +3296,14 @@ function fc(){
     f.gemToMcV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): Gem app on 7 Oct, after the $325 cleared: $363.33
+  // available on an $8,000 limit, so $7,636.67 owing.
+  if(!f.gemBalV3){
+    const g=(f.cards||[]).find(c=>/gem|latitude/i.test(c.name||''));
+    if(g && g.asOf==='2026-10-07' && Number(g.balance)===7275){ g.balance=7636.67; }
+    f.gemBalV3=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
