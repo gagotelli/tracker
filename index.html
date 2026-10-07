@@ -3253,6 +3253,15 @@ function fc(){
     f.gemRateV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): the spare $950 from the 7 Oct pay stays in Bank
+  // Australia as a buffer (and savings history for the car loan) instead
+  // of going to the Mastercard.
+  if(!f.bufferV1 && f.firstPay.date && Array.isArray(f.recurring)){
+    if(!f.recurring.some(r=>/buffer/i.test(r.name||'')))
+      f.recurring.push({name:'Savings buffer (Bank Australia)',amount:950,every:'Fortnightly',date:'2026-10-07',until:'2026-10-07',type:'Savings'});
+    f.bufferV1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
