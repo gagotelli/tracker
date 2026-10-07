@@ -3283,6 +3283,19 @@ function fc(){
     f.gemPaidV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): this month's Gem minimum was already paid from Up, so
+  // the 7 Oct Gem money ($325) goes on the Mastercard instead (higher daily
+  // interest). Gem payments restart on 21 Oct.
+  if(!f.gemToMcV1 && f.firstPay.date){
+    const g=(f.cards||[]).find(c=>/gem|latitude/i.test(c.name||''));
+    if(g && g.start==='2026-10-07') g.start='2026-10-21';
+    const t=(f.oneOffs||[]).find(o=>o.name==='Gem top up to minimum' && o.date==='2026-10-07');
+    if(t) t.name='Mastercard extra (top up)';
+    // The $325 paid from Up comes off the Gem balance.
+    if(g && Number(g.balance)===7600 && g.asOf==='2026-10-02'){ g.balance=7275; g.asOf='2026-10-07'; }
+    f.gemToMcV1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
