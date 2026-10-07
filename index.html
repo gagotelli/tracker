@@ -3262,6 +3262,19 @@ function fc(){
     f.bufferV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): card payments start on the 7 Oct pay, not 21 Oct.
+  // The Gem minimum ($325.74) is due 19 Oct, so it gets a $25.74 top up, and
+  // the buffer is what's left of the spare: $324.26.
+  if(!f.cardsV2 && f.firstPay.date && Array.isArray(f.cards)){
+    f.cards.forEach(c=>{ if(c.start==='2026-10-21') c.start='2026-10-07'; });
+    if(!Array.isArray(f.oneOffs)) f.oneOffs=[];
+    if(!f.oneOffs.some(o=>/gem/i.test(o.name||'') && o.date==='2026-10-07'))
+      f.oneOffs.push({name:'Gem top up to minimum',amount:25.74,date:'2026-10-07'});
+    const b=(f.recurring||[]).find(r=>/buffer/i.test(r.name||''));
+    if(b) b.amount=324.26;
+    f.cardsV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
