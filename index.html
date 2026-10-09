@@ -3334,6 +3334,18 @@ function fc(){
     f.iphoneV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): Afterpay on 9 Oct owes $2,764.52, of which $1,869 is
+  // the iPhone (monthly, above). The other $895.52 is paid ahead in two lots:
+  // $415.58 on 21 Oct (everything due by 8 Nov) and $479.94 on 4 Nov (the
+  // rest, all due by 8 Dec).
+  if(!f.afterpayV4 && Array.isArray(f.oneOffs)){
+    f.oneOffs=f.oneOffs.filter(o=>!(/^afterpay/i.test(o.name||'') && (o.date==='2026-10-21'||o.date==='2026-11-04')));
+    f.oneOffs.push({name:'Afterpay',amount:415.58,date:'2026-10-21'});
+    f.oneOffs.push({name:'Afterpay (final)',amount:479.94,date:'2026-11-04'});
+    f.oneOffs.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    f.afterpayV4=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
