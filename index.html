@@ -3326,6 +3326,14 @@ function fc(){
     f.stepPayV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (Oct 2026): iPhone on Afterpay is $77.88 a month, 24 payments,
+  // first on 8 Nov 2026, last on 8 Oct 2028.
+  if(!f.iphoneV2 && Array.isArray(f.recurring)){
+    const r=f.recurring.find(x=>/iphone/i.test(x.name||''));
+    if(r){ r.amount=77.88; r.date='2026-11-08'; r.until='2028-10-08'; }
+    f.iphoneV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
