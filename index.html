@@ -1275,6 +1275,23 @@ function applyV11Fixes(s){
   s.migrated = 11;
   return true;
 }
+// v12 (28 Oct 2026): card balances and cash from the apps, while the bank
+// feed is off. Mastercard $9,502.75 of $10,000; Gem $7,539.71 of $8,000;
+// $226.26 available in Personal.
+function applyV12Fixes(s){
+  if(Number(s.migrated) >= 12) return false;
+  Object.values(s.profiles || {}).forEach(p=>{
+    (p.accounts||[]).forEach(a=>{
+      const n=String(a.name||'').toLowerCase();
+      if(n.includes('commbank')||n.includes('mastercard')){ a.balance=9502.75; if(!(Number(a.limit)>0)) a.limit=10000; }
+      if(n.includes('gem')||n.includes('latitude')){ a.balance=7539.71; a.limit=8000; }
+    });
+    if(!p.settings) p.settings={};
+    p.settings.cashAvailable=226.26;
+  });
+  s.migrated = 12;
+  return true;
+}
 function applyDataFixes(s){
   const a=applyV5Fixes(s);
   const b=applyV6Fixes(s);
@@ -1283,7 +1300,8 @@ function applyDataFixes(s){
   const e=applyV9Fixes(s);
   const g=applyV10Fixes(s);
   const h=applyV11Fixes(s);
-  return a || b || c || d || e || g || h;
+  const i=applyV12Fixes(s);
+  return a || b || c || d || e || g || h || i;
 }
 applyDataFixes(store);
 if(!CLOUD) localStorage.setItem(STORE_KEY, JSON.stringify(store));
@@ -3383,6 +3401,28 @@ function fc(){
     f.afterpayV7=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (28 Oct 2026): balances from the apps. Mastercard $497.25 available
+  // on a $10,000 limit, so $9,502.75 owing; Gem $7,539.71 at the 24 Oct
+  // statement, with $41.09 interest that month (about 0.55% of the balance).
+  // Both counted from the 4 Nov pay, since the 21 Oct payments are already in.
+  // Afterpay owes $2,851.88: the iPhone ($77.88 x 24) plus $982.76 of orders,
+  // paid from the payday before each due date: $57.99 Bikebiz on 3 Nov (from
+  // cash on hand), $308.97 on 4 Nov, $488.43 on 18 Nov, $127.37 on 2 Dec.
+  if(!f.accountsV1028 && f.firstPay.date){
+    const mc=(f.cards||[]).find(c=>/commbank|mastercard/i.test(c.name||''));
+    if(mc){ mc.balance=9502.75; mc.asOf='2026-11-04'; }
+    const g=(f.cards||[]).find(c=>/gem|latitude/i.test(c.name||''));
+    if(g){ g.balance=7539.71; g.asOf='2026-11-04'; g.rate=0.55; g.interestDay=24; }
+    if(!Array.isArray(f.oneOffs)) f.oneOffs=[];
+    f.oneOffs=f.oneOffs.filter(o=>!(/^afterpay/i.test(o.name||'') && ['2026-11-03','2026-11-04','2026-11-18','2026-12-02'].includes(o.date)));
+    f.oneOffs.push({name:'Afterpay (Bikebiz)',amount:57.99,date:'2026-11-03'});
+    f.oneOffs.push({name:'Afterpay',amount:308.97,date:'2026-11-04'});
+    f.oneOffs.push({name:'Afterpay',amount:488.43,date:'2026-11-18'});
+    f.oneOffs.push({name:'Afterpay (final)',amount:127.37,date:'2026-12-02'});
+    f.oneOffs.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    f.accountsV1028=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
@@ -3503,14 +3543,17 @@ function fcSimulate(plan){
 
     // 5. Whatever is spare above the minimum.
     let extra=0, extraSaved=0;
-    const owingCards=cards.filter(c=>c.live && c.bal>0.005);
+    // A card whose balance is only known from a later date still takes the
+    // spare money before then (that's already in the balance it starts from),
+    // so it isn't counted as savings and isn't taken off twice.
+    const owingCards=cards.filter(c=>c.bal>0.005);
     if(plan.spare!=='pocket' && room>=roundTo){
       let pot=Math.floor(room/roundTo)*roundTo;
       if(plan.spare==='cards' && owingCards.length){
         owingCards.sort((a,b)=>b.rate-a.rate || a.bal-b.bal).forEach(c=>{
           if(pot<=0) return;
           const amt=Math.min(pot, c.bal);
-          c.bal=fcRound(c.bal-amt); pot-=amt; extra+=amt; room-=amt;
+          if(c.live) c.bal=fcRound(c.bal-amt); pot-=amt; extra+=amt; room-=amt;
           lines.push({g:'Cards', name:c.name+' extra', amt, d:p});
         });
       }
