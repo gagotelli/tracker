@@ -3423,6 +3423,18 @@ function fc(){
     f.accountsV1028=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (2 Nov 2026): exact Afterpay due dates from the app. Orders (not
+  // the iPhone) by payday: 4 Nov pay $391.78 (5, 12 and 15 Nov), 18 Nov pay
+  // $327.75 (19 Nov to 2 Dec), 2 Dec pay $237.45 (3 Dec onward, last ones).
+  if(!f.afterpayV1102 && Array.isArray(f.oneOffs)){
+    f.oneOffs=f.oneOffs.filter(o=>!(/^afterpay/i.test(o.name||'') && ['2026-11-03','2026-11-04','2026-11-18','2026-12-02'].includes(o.date)));
+    f.oneOffs.push({name:'Afterpay',amount:391.78,date:'2026-11-04'});
+    f.oneOffs.push({name:'Afterpay',amount:327.75,date:'2026-11-18'});
+    f.oneOffs.push({name:'Afterpay (final)',amount:237.45,date:'2026-12-02'});
+    f.oneOffs.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    f.afterpayV1102=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
