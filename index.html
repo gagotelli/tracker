@@ -3454,6 +3454,13 @@ function fc(){
     f.nov02V1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (2 Nov 2026): the car loan is on hold until finances are stable,
+  // so it comes out of the forecast. Add it back under Setup when it's on.
+  if(!f.noCarV1 && Array.isArray(f.recurring)){
+    f.recurring=f.recurring.filter(r=>!/car loan/i.test(r.name||''));
+    f.noCarV1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
