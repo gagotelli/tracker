@@ -3435,6 +3435,25 @@ function fc(){
     f.afterpayV1102=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (2 Nov 2026): about $400 of weekend spending went on the
+  // Mastercard ($100 available, so about $9,900 owing). From the 4 Nov pay:
+  // Tono's $250 is paid (agreed for that day), the Gem payment is the full
+  // $329.14 minimum, and there's no Mastercard extra. Pocket money is below
+  // $600 this fortnight by choice.
+  if(!f.nov02V1 && f.firstPay.date){
+    const mc=(f.cards||[]).find(c=>/commbank|mastercard/i.test(c.name||''));
+    if(mc){ mc.balance=9900; mc.asOf='2026-11-04'; }
+    const g=(f.cards||[]).find(c=>/gem|latitude/i.test(c.name||''));
+    if(g && Number(g.balance)===7539.71) g.balance=7510.57;
+    const t=(f.friends||[]).find(x=>/^tono$/i.test(String(x.name||'').trim()));
+    if(t && Number(t.amount)===1600){ t.amount=1350; t.start='2026-11-18'; }
+    if(!Array.isArray(f.oneOffs)) f.oneOffs=[];
+    f.oneOffs.push({name:'Tono (friend)',amount:250,date:'2026-11-04'});
+    f.oneOffs.push({name:'Gem minimum top up',amount:29.14,date:'2026-11-04'});
+    f.oneOffs.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    f.nov02V1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
