@@ -21,3 +21,7 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
           projectId: finance-tracker-gg
           channelId: live
+          # firebase-tools 15.34+ also needs the Service Usage Consumer role on
+          # the service account. Pinned to the last version that deployed fine;
+          # remove this line once that role is granted.
+          firebaseToolsVersion: 15.33.0
