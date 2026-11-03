@@ -3461,6 +3461,16 @@ function fc(){
     f.noCarV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (3 Nov 2026): Bupa health insurance moved to Thursdays. $78 on
+  // 5 Nov, then $57.55 every second Thursday from 19 Nov.
+  if(!f.bupaV1 && Array.isArray(f.recurring)){
+    const h=f.recurring.find(r=>/health insurance/i.test(r.name||''));
+    if(h){ h.name='Bupa health insurance'; h.date='2026-11-19'; }
+    f.oneOffs=(f.oneOffs||[]).filter(o=>!/bupa/i.test(o.name||''));
+    f.oneOffs.push({name:'Bupa health insurance',amount:78,date:'2026-11-05'});
+    f.bupaV1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
