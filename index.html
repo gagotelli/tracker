@@ -3507,6 +3507,17 @@ function fc(){
     f.apNewV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (6 Nov 2026): Tono must get $250 on 18 Nov and 2 Dec even if it
+  // means less than $600 those fortnights. Queue resumes from 16 Dec.
+  if(!f.tonoFixV1 && Array.isArray(f.friends)){
+    const t=f.friends.find(x=>/^tono/i.test(x.name||''));
+    if(t && Math.abs(t.amount-1350)<0.01){ t.amount=850; t.start='2026-12-16'; }
+    f.oneOffs=(f.oneOffs||[]).filter(o=>!(/^tono/i.test(o.name||'') && ['2026-11-18','2026-12-02'].includes(o.date)));
+    f.oneOffs.push({name:'Tono (friend)',amount:250,date:'2026-11-18'});
+    f.oneOffs.push({name:'Tono (friend)',amount:250,date:'2026-12-02'});
+    f.tonoFixV1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
