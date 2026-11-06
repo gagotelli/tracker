@@ -3471,6 +3471,16 @@ function fc(){
     f.bupaV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (6 Nov 2026): NSW Revenue fine changes from $12 weekly (last one
+  // 6 Nov) to $30 fortnightly from Wednesday 18 Nov.
+  if(!f.nswV2 && Array.isArray(f.recurring)){
+    const i=f.recurring.findIndex(r=>/nsw revenue/i.test(r.name||'') && r.every==='Weekly');
+    if(i>=0) f.recurring[i].until='2026-11-06';
+    if(!f.recurring.some(r=>/nsw revenue/i.test(r.name||'') && r.every==='Fortnightly'))
+      f.recurring.splice(i<0?f.recurring.length:i+1,0,{name:'NSW Revenue',amount:30,every:'Fortnightly',date:'2026-11-18',until:'',type:'Bill'});
+    f.nswV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
