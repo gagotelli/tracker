@@ -3498,6 +3498,15 @@ function fc(){
     f.lacosteV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (6 Nov 2026): new Afterpay orders first due 18 Nov (Chemist
+  // Warehouse $15, Amazon $16.24 + $3.50, Tommy Hilfiger $59.50), 4 x $94.24.
+  if(!f.apNewV1 && Array.isArray(f.oneOffs)){
+    f.oneOffs=f.oneOffs.filter(o=>!/new orders/i.test(o.name||''));
+    ['2026-11-18','2026-12-02','2026-12-16','2026-12-30'].forEach((d,i)=>
+      f.oneOffs.push({name:'Afterpay new orders'+(i===3?' (final)':''),amount:94.24,date:d}));
+    f.apNewV1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
