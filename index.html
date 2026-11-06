@@ -3489,6 +3489,15 @@ function fc(){
     f.flip18V1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (6 Nov 2026): Lacoste order on Afterpay, $390 in 4 x $97.50
+  // fortnightly from 18 Nov.
+  if(!f.lacosteV1 && Array.isArray(f.oneOffs)){
+    f.oneOffs=f.oneOffs.filter(o=>!/lacoste/i.test(o.name||''));
+    ['2026-11-18','2026-12-02','2026-12-16','2026-12-30'].forEach((d,i)=>
+      f.oneOffs.push({name:'Afterpay Lacoste'+(i===3?' (final)':''),amount:97.5,date:d}));
+    f.lacosteV1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
