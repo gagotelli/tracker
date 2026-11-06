@@ -3481,6 +3481,14 @@ function fc(){
     f.nswV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (6 Nov 2026): Flip is paid on the 18th (invoice allows it), so it
+  // comes from the payday instead of the day before.
+  if(!f.flip18V1 && Array.isArray(f.recurring)){
+    const r=f.recurring.find(x=>/^flip/i.test(x.name||''));
+    if(r && /-17$/.test(r.date||'')) r.date='2026-11-18';
+    f.flip18V1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
