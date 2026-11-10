@@ -3526,6 +3526,16 @@ function fc(){
     f.amazon205V1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (10 Nov 2026): StepPay (Discocil + Apple) 18 Nov $89.15,
+  // 2 Dec $89.15, 16 Dec $44.75 (final).
+  if(!f.stepPayV3 && Array.isArray(f.oneOffs)){
+    f.oneOffs=f.oneOffs.filter(o=>!(/^steppay/i.test(o.name||'') && o.date>='2026-11-10'));
+    f.oneOffs.push({name:'StepPay',amount:89.15,date:'2026-11-18'});
+    f.oneOffs.push({name:'StepPay',amount:89.15,date:'2026-12-02'});
+    f.oneOffs.push({name:'StepPay (final)',amount:44.75,date:'2026-12-16'});
+    f.stepPayV3=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
