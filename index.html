@@ -3518,6 +3518,14 @@ function fc(){
     f.tonoFixV1=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (10 Nov 2026): Amazon $205 on Afterpay, $52 then 3 x $51 from 18 Nov.
+  if(!f.amazon205V1 && Array.isArray(f.oneOffs)){
+    f.oneOffs=f.oneOffs.filter(o=>!/amazon \$205/i.test(o.name||''));
+    [['2026-11-18',52],['2026-12-02',51],['2026-12-16',51],['2026-12-30',51]].forEach(([d,a],i)=>
+      f.oneOffs.push({name:'Afterpay Amazon $205'+(i===3?' (final)':''),amount:a,date:d}));
+    f.amazon205V1=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
