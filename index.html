@@ -3536,6 +3536,16 @@ function fc(){
     f.stepPayV3=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (18 Nov 2026): iCloud paused until 18 Jan. The 18 Jan payment is
+  // set aside from the 16 Dec pay; after that it's monthly on the 18th.
+  if(!f.icloudV2 && Array.isArray(f.recurring)){
+    const r=f.recurring.find(x=>/icloud/i.test(x.name||''));
+    if(r) r.date='2027-02-18';
+    f.oneOffs=(f.oneOffs||[]).filter(o=>!/icloud/i.test(o.name||''));
+    f.oneOffs.push({name:'iCloud (for 18 Jan)',amount:14.99,date:'2026-12-16'});
+    f.icloudV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
