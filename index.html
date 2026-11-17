@@ -3546,6 +3546,27 @@ function fc(){
     f.icloudV2=true;
     setTimeout(()=>saveStore(),0);
   }
+  // One-off (18 Nov 2026): Afterpay app totals replace the per-order list.
+  // Total owed $3,124.54; orders (not iPhone) due by 3 Dec $373.97, 4 to 18 Dec
+  // $488.49, 19 Dec to 17 Jan $470.96. iPhone stays as its own monthly item.
+  if(!f.afterpayV1118 && Array.isArray(f.oneOffs)){
+    f.oneOffs=f.oneOffs.filter(o=>!(/^afterpay/i.test(o.name||'') && !/iphone/i.test(o.name||'') && o.date>='2026-11-19'));
+    f.oneOffs.push({name:'Afterpay',amount:373.97,date:'2026-12-02'});
+    f.oneOffs.push({name:'Afterpay',amount:488.49,date:'2026-12-16'});
+    f.oneOffs.push({name:'Afterpay (final)',amount:470.96,date:'2026-12-30'});
+    f.afterpayV1118=true;
+    setTimeout(()=>saveStore(),0);
+  }
+  // One-off (18 Nov 2026): Toño keeps getting $250 on 16 and 30 Dec too.
+  if(!f.tonoFixV2 && Array.isArray(f.friends)){
+    const t=f.friends.find(x=>/^tono/i.test(x.name||''));
+    if(t && Math.abs(t.amount-850)<0.01){ t.amount=350; t.start='2027-01-13'; }
+    f.oneOffs=(f.oneOffs||[]).filter(o=>!(/^tono/i.test(o.name||'') && ['2026-12-16','2026-12-30'].includes(o.date)));
+    f.oneOffs.push({name:'Tono (friend)',amount:250,date:'2026-12-16'});
+    f.oneOffs.push({name:'Tono (friend)',amount:250,date:'2026-12-30'});
+    f.tonoFixV2=true;
+    setTimeout(()=>saveStore(),0);
+  }
   return f;
 }
 const fcNum=v=>{ const n=Number(v); return isFinite(n)?n:0; };
